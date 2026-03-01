@@ -38,10 +38,14 @@ public class AdminBootstrap implements ApplicationRunner { // инициализ
     @Transactional
     public void run(ApplicationArguments args) {
         String phoneNorm = Crypto.normPhone(adminPhone);
-        if (phoneNorm.isEmpty()) return;
+        if (phoneNorm.isEmpty()) {
+            return;
+        }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
-        if (users.findByPhoneHash(phoneHash).isPresent()) return;
+        if (users.findByPhoneHash(phoneHash).isPresent()) {
+            return;
+        }
 
         Instant now = Instant.now();
 

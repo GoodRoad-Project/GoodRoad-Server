@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/moderators") //доступно только админу-модератору (см. Security Config)
+@RequestMapping("/api/moderators") // доступно только админу-модератору (см. Security Config)
 public class ModeratorController {
 
     private final ModeratorService svc;
@@ -14,7 +14,8 @@ public class ModeratorController {
         this.svc = svc;
     }
 
-    public record CreateModeratorReq(String firstName, String lastName, @NotBlank String phone, @NotBlank String password) {}
+    public record CreateModeratorReq(String firstName, String lastName, @NotBlank String phone, @NotBlank String password) {
+    }
 
     @PostMapping
     public String create(@Valid @RequestBody CreateModeratorReq req) {

@@ -16,16 +16,20 @@ public class AuthController {
     }
 
     // ниже модели данных для входящих запросов и исходящих ответов API
+    public record RegisterReq(String firstName, String lastName, @NotBlank String phone, @NotBlank String password) {
+    }
 
-    public record RegisterReq(String firstName, String lastName, @NotBlank String phone, @NotBlank String password) {}
+    public record LoginReq(@NotBlank String phone, @NotBlank String password) {
+    }
 
-    public record LoginReq(@NotBlank String phone, @NotBlank String password) {}
+    public record ChangePassReq(@NotBlank String oldPassword, @NotBlank String newPassword) {
+    }
 
-    public record ChangePassReq(@NotBlank String oldPassword, @NotBlank String newPassword) {}
+    public record UserView(String id, String role) {
+    }
 
-    public record UserView(String id, String role) {}
-
-    public record AuthResp(UserView user) {}
+    public record AuthResp(UserView user) {
+    }
 
     @PostMapping("/register")
     public AuthResp register(@Valid @RequestBody RegisterReq req) {

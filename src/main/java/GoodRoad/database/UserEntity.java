@@ -7,6 +7,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "users")
+@SuppressWarnings("unused")
 public class UserEntity {
 
     @Id
@@ -40,7 +41,8 @@ public class UserEntity {
     @Column(name = "last_active_at", nullable = false)
     private Instant lastActiveAt;
 
-    @PrePersist // выполняется перед первой вставкой в таблицу в случае, если reatedAt, lastActiveAt не заданы (у модераторов такое возможно, к примеру)
+    // выполняется перед первой вставкой в таблицу в случае, если reatedAt, lastActiveAt не заданы (у модераторов такое возможно, к примеру)
+    @PrePersist
     private void prePersist() {
         Instant now = Instant.now();
         if (createdAt == null) {
