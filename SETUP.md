@@ -17,5 +17,8 @@ mvn clean install
 ```
 docker compose down -v
 docker compose --env-file .env up -d
+set -a
+source .env
+set +a
 mvn clean spring-boot:run
 ```
