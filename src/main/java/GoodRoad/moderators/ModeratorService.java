@@ -1,0 +1,63 @@
+package GoodRoad.moderators;
+
+import GoodRoad.api.ApiErrors.ApiException;
+import GoodRoad.database.UserEntity;
+import GoodRoad.database.UserRepo;
+import GoodRoad.model.Role;
+import GoodRoad.security.Crypto;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.UUID;
+
+@Service
+public class ModeratorService {
+
+    private final UserRepo users;
+    private final PasswordEncoder pe;
+
+    public ModeratorService(UserRepo users, PasswordEncoder pe) {
+        this.users = users;
+        this.pe = pe;
+    }
+
+    @Transactional
+    public String create(String firstName, String lastName, String phone, String password) {
+        String phoneNorm = Crypto.normPhone(phone);
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PHONE", "Bad phone");
+        }
+
+        String phoneHash = Crypto.sha256Hex(phoneNorm);
+        if (users.findByPhoneHash(phoneHash).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "PHONE_USED", "Phone already used");
+        }
+
+        UserEntity u = new UserEntity();
+        u.setId(UUID.randomUUID());
+        u.setFirstName(firstName);
+        u.setLastName(lastName);
+        u.setPhoneHash(phoneHash);
+        u.setRole(Role.MODERATOR.name());
+        u.setPassHash(pe.encode(password));
+        u.setActive(true);
+
+        return users.save(u).getId().toString();
+    }
+
+    @Transactional
+    public void disable(String id) {
+        UUID userId = UUID.fromString(id);
+        UserEntity u = users.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
+
+        if (Role.MODERATOR_ADMIN.name().equals(u.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CANT_DISABLE_ADMIN", "Cant disable admin moderator");
+        }
+
+        u.setActive(false);
+        users.save(u);
+    }
+}
