@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    driver-class-name: org.postgresql.Driver
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+
+app:
+  phone:
+    enc_key_b64: ${PHONE_ENC_KEY_B64}
+  admin:
+    phone: ${ADMIN_PHONE}
+    pass: ${ADMIN_PASS}
