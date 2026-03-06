@@ -4,6 +4,7 @@ import GoodRoad.api.ApiErrors.ApiException;
 import GoodRoad.database.UserEntity;
 import GoodRoad.database.UserRepo;
 import GoodRoad.security.Crypto;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,9 +24,34 @@ public class AuthService {
         this.pe = pe;
     }
 
+    public record RegisterReq(
+            String firstName,
+            String lastName,
+            @NotBlank String phone,
+            @NotBlank String password
+    ) {
+    }
+
+    public record LoginReq(
+            @NotBlank String phone,
+            @NotBlank String password
+    ) {
+    }
+
+    public record UserView(
+            String id,
+            String role
+    ) {
+    }
+
+    public record AuthResp(
+            UserView user
+    ) {
+    }
+
     @Transactional
-    public AuthController.AuthResp register(AuthController.RegisterReq req) {
-        String phoneNorm = Crypto.normPhone(req.phone()); // нормализуем телефон, оставляем только цифры
+    public AuthResp register(RegisterReq req) {
+        String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PHONE", "Bad phone");
         }
@@ -53,7 +79,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthController.AuthResp login(AuthController.LoginReq req) {
+    public AuthResp login(LoginReq req) {
         String phoneNorm = Crypto.normPhone(req.phone());
         String phoneHash = Crypto.sha256Hex(phoneNorm);
 
@@ -63,18 +89,18 @@ public class AuthService {
         if (!u.isActive()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
         }
-        if (!pe.matches(req.password(), u.getPassHash())) { // проверяем пароль
+        if (!pe.matches(req.password(), u.getPassHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDS", "Bad credentials");
         }
 
-        u.setLastActiveAt(Instant.now()); // в таблицах аккаунт автоудаляется через 5 лет, поэтому проверяем последнюю активность
+        u.setLastActiveAt(Instant.now());
         users.save(u);
 
         return toResp(u);
     }
 
     @Transactional
-    public void changePass(String phoneFromAuth, AuthController.ChangePassReq req) {
+    public void changePass(String phoneFromAuth, String oldPassword, String newPassword) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
@@ -87,16 +113,16 @@ public class AuthService {
         if (!u.isActive()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
         }
-        if (!pe.matches(req.oldPassword(), u.getPassHash())) {
+        if (!pe.matches(oldPassword, u.getPassHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_OLD_PASS", "Bad old password");
         }
 
-        u.setPassHash(pe.encode(req.newPassword())); // хэш нового пароля
+        u.setPassHash(pe.encode(newPassword));
         u.setLastActiveAt(Instant.now());
         users.save(u);
     }
 
-    private AuthController.AuthResp toResp(UserEntity u) {
-        return new AuthController.AuthResp(new AuthController.UserView(u.getId().toString(), u.getRole()));
+    private AuthResp toResp(UserEntity u) {
+        return new AuthResp(new UserView(u.getId().toString(), u.getRole()));
     }
 }
