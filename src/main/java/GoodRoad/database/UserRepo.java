@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface UserRepo extends JpaRepository<UserEntity, UUID> { // нужен, чтобы ходить в таблицу и users выполнять всякие методы
+public interface UserRepo extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByPhoneHash(String phoneHash);
 
@@ -17,7 +17,8 @@ public interface UserRepo extends JpaRepository<UserEntity, UUID> { // нуже�
     @Query("""
         delete from UserEntity u
         where u.role <> 'MODERATOR_ADMIN'
+          and u.active = false
           and u.lastActiveAt < :cutoff
        """)
-    void deleteInactiveBefore(@Param("cutoff") Instant cutoff);
+    int deleteInactiveBefore(@Param("cutoff") Instant cutoff);
 }
