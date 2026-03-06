@@ -1,0 +1,475 @@
+package GoodRoad.database;
+
+import GoodRoad.api.ApiErrors.ApiException;
+import GoodRoad.model.ObstacleType;
+import GoodRoad.security.Crypto;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@Service
+public class UserReviewService {
+
+    private static final String STATUS_PENDING = "PENDING";
+    private static final String STATUS_APPROVED = "APPROVED";
+
+    private final UserRepo users;
+    private final ObstacleFeatureRepo features;
+    private final ObstacleReviewRepo reviews;
+    private final ObstacleReviewPhotoRepo photos;
+    private final ObstacleReviewObstacleRepo reviewObstacles;
+
+    public UserReviewService(
+            UserRepo users,
+            ObstacleFeatureRepo features,
+            ObstacleReviewRepo reviews,
+            ObstacleReviewPhotoRepo photos,
+            ObstacleReviewObstacleRepo reviewObstacles
+    ) {
+        this.users = users;
+        this.features = features;
+        this.reviews = reviews;
+        this.photos = photos;
+        this.reviewObstacles = reviewObstacles;
+    }
+
+    public record AddressReq(
+            String country,
+            String region,
+            String localityType,
+            String city,
+            String street,
+            String house,
+            String placeName
+    ) {
+    }
+
+    public record UpsertReviewReq(
+            double latitude,
+            double longitude,
+            AddressReq address,
+            short rating,
+            List<String> obstacleTypes,
+            String comment,
+            List<String> photoUrls
+    ) {
+    }
+
+    public record ReviewCardResp(
+            String id,
+            String featureId,
+            AddressReq address,
+            double latitude,
+            double longitude,
+            short rating,
+            List<String> obstacleTypes,
+            String comment,
+            List<String> photoUrls,
+            String status,
+            Instant createdAt,
+            int awardedPoints
+    ) {
+    }
+
+    public record ReviewPointsResp(int totalPoints, long approvedReviews) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReviewCardResp> listMine(String phoneFromAuth) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        List<ObstacleReviewEntity> mine = reviews.findByAuthorIdOrderByCreatedAtDesc(user.getId());
+        return buildCards(mine);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewPointsResp points(String phoneFromAuth) {
+        int total = 0;
+        long approved = 0;
+        for (ReviewCardResp item : listMine(phoneFromAuth)) {
+            if (STATUS_APPROVED.equals(item.status())) {
+                total += item.awardedPoints();
+                approved++;
+            }
+        }
+        return new ReviewPointsResp(total, approved);
+    }
+
+    @Transactional
+    public ReviewCardResp create(String phoneFromAuth, UpsertReviewReq req) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        ValidatedReviewInput input = validate(req);
+        ObstacleFeatureEntity feature = resolveOrCreateFeature(input);
+
+        if (reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId()).isPresent()) {
+            throw new ApiException(HttpStatus.CONFLICT, "DUP_REVIEW", "Review already exists");
+        }
+
+        ObstacleReviewEntity review = new ObstacleReviewEntity();
+        review.setId(UUID.randomUUID());
+        review.setFeatureId(feature.getId());
+        review.setAuthorId(user.getId());
+        review.setSeverity(input.rating());
+        review.setText(input.comment());
+        review.setCreatedAt(Instant.now());
+        review.setStatus(STATUS_PENDING);
+        reviews.save(review);
+
+        saveReviewObstacles(review.getId(), input.obstacleTypes());
+        savePhotos(review.getId(), input.photoUrls());
+
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
+
+        return buildCards(List.of(review)).get(0);
+    }
+
+    @Transactional
+    public ReviewCardResp updateMine(String phoneFromAuth, String reviewId, UpsertReviewReq req) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        ObstacleReviewEntity review = findMineReview(user, reviewId);
+
+        String oldStatus = review.getStatus();
+        UUID oldFeatureId = review.getFeatureId();
+
+        ValidatedReviewInput input = validate(req);
+        ObstacleFeatureEntity feature = resolveOrCreateFeature(input);
+
+        if (!feature.getId().equals(oldFeatureId)) {
+            reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId())
+                    .ifPresent(other -> {
+                        throw new ApiException(HttpStatus.CONFLICT, "DUP_REVIEW", "Review already exists");
+                    });
+        }
+
+        review.setFeatureId(feature.getId());
+        review.setSeverity(input.rating());
+        review.setText(input.comment());
+        review.setStatus(STATUS_PENDING);
+        reviews.save(review);
+
+        reviewObstacles.deleteByIdReviewId(review.getId());
+        photos.deleteByReviewId(review.getId());
+        saveReviewObstacles(review.getId(), input.obstacleTypes());
+        savePhotos(review.getId(), input.photoUrls());
+
+        if (STATUS_APPROVED.equals(oldStatus)) {
+            recomputeFeatureAggregate(oldFeatureId);
+            if (!oldFeatureId.equals(feature.getId())) {
+                recomputeFeatureAggregate(feature.getId());
+            }
+        }
+
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
+
+        return buildCards(List.of(review)).get(0);
+    }
+
+    @Transactional
+    public void deleteMine(String phoneFromAuth, String reviewId) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        ObstacleReviewEntity review = findMineReview(user, reviewId);
+
+        String oldStatus = review.getStatus();
+        UUID featureId = review.getFeatureId();
+        reviews.delete(review);
+
+        if (STATUS_APPROVED.equals(oldStatus)) {
+            recomputeFeatureAggregate(featureId);
+        }
+
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
+    }
+
+    private List<ReviewCardResp> buildCards(List<ObstacleReviewEntity> rawReviews) {
+        if (rawReviews.isEmpty()) {
+            return List.of();
+        }
+
+        List<UUID> reviewIds = new ArrayList<>();
+        List<UUID> featureIds = new ArrayList<>();
+        for (ObstacleReviewEntity review : rawReviews) {
+            reviewIds.add(review.getId());
+            featureIds.add(review.getFeatureId());
+        }
+
+        Map<UUID, ObstacleFeatureEntity> featureById = new HashMap<>();
+        for (ObstacleFeatureEntity feature : features.findAllById(featureIds)) {
+            featureById.put(feature.getId(), feature);
+        }
+
+        Map<UUID, List<String>> photosByReview = new LinkedHashMap<>();
+        for (ObstacleReviewPhotoEntity photo : photos.findByReviewIdIn(reviewIds)) {
+            photosByReview.computeIfAbsent(photo.getReviewId(), k -> new ArrayList<>()).add(photo.getUrl());
+        }
+
+        Map<UUID, List<String>> obstaclesByReview = new LinkedHashMap<>();
+        for (ObstacleReviewObstacleEntity item : reviewObstacles.findByIdReviewIdIn(reviewIds)) {
+            obstaclesByReview.computeIfAbsent(item.getId().getReviewId(), k -> new ArrayList<>())
+                    .add(item.getId().getObstacleType());
+        }
+
+        List<ReviewCardResp> out = new ArrayList<>();
+        for (ObstacleReviewEntity review : rawReviews) {
+            ObstacleFeatureEntity feature = featureById.get(review.getFeatureId());
+            if (feature == null) {
+                continue;
+            }
+
+            List<String> itemPhotos = photosByReview.getOrDefault(review.getId(), List.of());
+            List<String> itemObstacles = obstaclesByReview.getOrDefault(review.getId(), List.of());
+            int awardedPoints = STATUS_APPROVED.equals(review.getStatus())
+                    ? calcPoints(review.getText(), itemPhotos)
+                    : 0;
+
+            out.add(new ReviewCardResp(
+                    review.getId().toString(),
+                    feature.getId().toString(),
+                    new AddressReq(
+                            feature.getCountry(),
+                            feature.getRegion(),
+                            feature.getLocalityType(),
+                            feature.getCity(),
+                            feature.getStreet(),
+                            feature.getHouse(),
+                            feature.getPlaceName()
+                    ),
+                    feature.getLat(),
+                    feature.getLon(),
+                    review.getSeverity(),
+                    itemObstacles,
+                    review.getText(),
+                    itemPhotos,
+                    review.getStatus(),
+                    review.getCreatedAt(),
+                    awardedPoints
+            ));
+        }
+        return out;
+    }
+
+    private void saveReviewObstacles(UUID reviewId, List<String> obstacleTypes) {
+        for (String obstacleType : obstacleTypes) {
+            ObstacleReviewObstacleEntity entity = new ObstacleReviewObstacleEntity();
+            entity.setId(new ObstacleReviewObstacleKey(reviewId, obstacleType));
+            reviewObstacles.save(entity);
+        }
+    }
+
+    private void savePhotos(UUID reviewId, List<String> photoUrls) {
+        for (String url : photoUrls) {
+            ObstacleReviewPhotoEntity photo = new ObstacleReviewPhotoEntity();
+            photo.setId(UUID.randomUUID());
+            photo.setReviewId(reviewId);
+            photo.setUrl(url);
+            photo.setCreatedAt(Instant.now());
+            photos.save(photo);
+        }
+    }
+
+    private ObstacleFeatureEntity resolveOrCreateFeature(ValidatedReviewInput input) {
+        ObstacleFeatureEntity feature = features.findByAddressAndType(
+                input.primaryObstacleType(),
+                input.address().country(),
+                input.address().region(),
+                input.address().localityType(),
+                input.address().city(),
+                input.address().street(),
+                input.address().house(),
+                input.address().placeName()
+        ).orElse(null);
+
+        if (feature != null) {
+            feature.setLat(input.latitude());
+            feature.setLon(input.longitude());
+            features.save(feature);
+            return feature;
+        }
+
+        ObstacleFeatureEntity created = new ObstacleFeatureEntity();
+        created.setId(UUID.randomUUID());
+        created.setType(input.primaryObstacleType());
+        created.setLat(input.latitude());
+        created.setLon(input.longitude());
+        created.setCountry(input.address().country());
+        created.setRegion(input.address().region());
+        created.setLocalityType(input.address().localityType());
+        created.setCity(input.address().city());
+        created.setStreet(input.address().street());
+        created.setHouse(input.address().house());
+        created.setPlaceName(input.address().placeName());
+        created.setReviewsCount(0);
+        created.setSeverityEst(null);
+        created.setLastReviewedAt(null);
+        features.save(created);
+        return created;
+    }
+
+    private void recomputeFeatureAggregate(UUID featureId) {
+        ObstacleFeatureEntity f = features.findById(featureId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature"));
+
+        long cnt = reviews.countByFeatureIdAndStatus(featureId, STATUS_APPROVED);
+        Double avg = reviews.avgSeverity(featureId, STATUS_APPROVED);
+        Instant last = reviews.lastAt(featureId, STATUS_APPROVED);
+
+        f.setReviewsCount((int) cnt);
+        f.setLastReviewedAt(last);
+
+        if (avg == null || cnt == 0) {
+            f.setSeverityEst(null);
+        } else {
+            short est = (short) Math.max(1, Math.min(5, Math.round(avg.floatValue())));
+            f.setSeverityEst(est);
+        }
+
+        features.save(f);
+    }
+
+    private ValidatedReviewInput validate(UpsertReviewReq req) {
+        if (req == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_REVIEW", "Bad review");
+        }
+        if (req.rating() < 1 || req.rating() > 5) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_RATING", "Bad rating");
+        }
+        if (Double.isNaN(req.latitude()) || Double.isNaN(req.longitude())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_COORDS", "Bad coordinates");
+        }
+
+        AddressReq address = validateAddress(req.address());
+        List<String> obstacleTypes = ObstacleType.normalizeMany(req.obstacleTypes());
+        List<String> photoUrls = normalizePhotoUrls(req.photoUrls());
+        String comment = blankToNull(req.comment());
+        String primaryObstacleType = choosePrimaryObstacleType(obstacleTypes);
+
+        return new ValidatedReviewInput(
+                req.latitude(),
+                req.longitude(),
+                address,
+                req.rating(),
+                obstacleTypes,
+                primaryObstacleType,
+                comment,
+                photoUrls
+        );
+    }
+
+    private AddressReq validateAddress(AddressReq raw) {
+        if (raw == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ADDRESS", "Bad address");
+        }
+        String country = requireAddressValue(raw.country());
+        String region = requireAddressValue(raw.region());
+        String localityType = requireAddressValue(raw.localityType());
+        String city = requireAddressValue(raw.city());
+        String street = requireAddressValue(raw.street());
+        String house = requireAddressValue(raw.house());
+        String placeName = blankToNull(raw.placeName());
+        return new AddressReq(country, region, localityType, city, street, house, placeName);
+    }
+
+    private List<String> normalizePhotoUrls(Collection<String> rawUrls) {
+        List<String> out = new ArrayList<>();
+        if (rawUrls == null) {
+            return out;
+        }
+        for (String raw : rawUrls) {
+            String value = blankToNull(raw);
+            if (value != null) {
+                out.add(value);
+            }
+        }
+        return out;
+    }
+
+    private String choosePrimaryObstacleType(List<String> obstacleTypes) {
+        for (String canonical : ObstacleType.allNames()) {
+            if (obstacleTypes.contains(canonical)) {
+                return canonical;
+            }
+        }
+        return obstacleTypes.get(0);
+    }
+
+    private UserEntity findCurrent(String phoneFromAuth) {
+        return users.findByPhoneHash(currentPhoneHash(phoneFromAuth))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+    }
+
+    private String currentPhoneHash(String phoneFromAuth) {
+        String phoneNorm = Crypto.normPhone(phoneFromAuth);
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+        }
+        return Crypto.sha256Hex(phoneNorm);
+    }
+
+    private ObstacleReviewEntity findMineReview(UserEntity user, String reviewId) {
+        UUID id = parseUuid(reviewId);
+        return reviews.findByIdAndAuthorId(id, user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_REVIEW", "No review"));
+    }
+
+    private int calcPoints(String comment, List<String> photoUrls) {
+        boolean hasComment = comment != null && !comment.isBlank();
+        boolean hasPhoto = photoUrls != null && !photoUrls.isEmpty();
+
+        if (hasPhoto && hasComment) {
+            return 20;
+        }
+        if (hasPhoto) {
+            return 15;
+        }
+        if (hasComment) {
+            return 10;
+        }
+        return 5;
+    }
+
+    private UUID parseUuid(String raw) {
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+        }
+    }
+
+    private String requireAddressValue(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ADDRESS", "Bad value");
+        }
+        return normalized;
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String s = value.trim();
+        return s.isEmpty() ? null : s;
+    }
+
+    private record ValidatedReviewInput(
+            double latitude,
+            double longitude,
+            AddressReq address,
+            short rating,
+            List<String> obstacleTypes,
+            String primaryObstacleType,
+            String comment,
+            List<String> photoUrls
+    ) {
+    }
+}
