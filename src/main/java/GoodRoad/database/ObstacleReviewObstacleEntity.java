@@ -1,15 +1,19 @@
 package GoodRoad.database;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "obstacle_review_obstacle")
-public class ObstacleReviewObstacleEntity { // нужно для списка препядствий, которые отмечаем в отзыве
+public class ObstacleReviewObstacleEntity { // нужно для списка препятствий, которые отмечаем в отзыве
 
     @EmbeddedId
     private ObstacleReviewObstacleKey id;
+
+    @Column(name = "severity", nullable = false)
+    private short severity;
 
     public ObstacleReviewObstacleKey getId() {
         return id;
@@ -17,5 +21,13 @@ public class ObstacleReviewObstacleEntity { // нужно для списка п
 
     public void setId(ObstacleReviewObstacleKey id) {
         this.id = id;
+    }
+
+    public short getSeverity() {
+        return severity;
+    }
+
+    public void setSeverity(short severity) {
+        this.severity = severity;
     }
 }

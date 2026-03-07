@@ -80,11 +80,13 @@ create table if not exists obstacle_review_photo (
 
 create index if not exists ix_obstacle_review_photo_review on obstacle_review_photo(review_id);
 
--- храним список отмеченных препятствий внутри одного отзыва. Хранить это в bstacle_review не получится, т.к. в одной строке нельзя хранить произвольный список типов препятствий без костылей
+-- Храним список отмеченных препятствий внутри одного отзыва. Хранить это в bstacle_review не получится, т.к. в одной строке нельзя хранить произвольный список типов препятствий без костылей
 create table if not exists obstacle_review_obstacle (
     review_id     uuid not null references obstacle_review(id) on delete cascade,
     obstacle_type varchar(32) not null
         check (obstacle_type in ('CURB', 'STAIRS', 'ROAD_SLOPE', 'POTHOLES', 'SAND', 'GRAVEL')),
+    severity      smallint not null
+        check (severity between 0 and 3),
     primary key (review_id, obstacle_type)
 );
 

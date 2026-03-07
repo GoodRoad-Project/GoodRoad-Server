@@ -53,12 +53,18 @@ public class UserReviewService {
     ) {
     }
 
+    public record ObstacleSeverityItem(
+            String obstacleType,
+            short severity
+    ) {
+    }
+
     public record UpsertReviewReq(
             double latitude,
             double longitude,
             AddressReq address,
             short rating,
-            List<String> obstacleTypes,
+            List<ObstacleSeverityItem> obstacles,
             String comment,
             List<String> photoUrls
     ) {
@@ -71,7 +77,7 @@ public class UserReviewService {
             double latitude,
             double longitude,
             short rating,
-            List<String> obstacleTypes,
+            List<ObstacleSeverityItem> obstacles,
             String comment,
             List<String> photoUrls,
             String status,
@@ -123,7 +129,7 @@ public class UserReviewService {
         review.setStatus(STATUS_PENDING);
         reviews.save(review);
 
-        saveReviewObstacles(review.getId(), input.obstacleTypes());
+        saveReviewObstacles(review.getId(), input.obstacles());
         savePhotos(review.getId(), input.photoUrls());
 
         user.setLastActiveAt(Instant.now());
@@ -158,7 +164,7 @@ public class UserReviewService {
 
         reviewObstacles.deleteByIdReviewId(review.getId());
         photos.deleteByReviewId(review.getId());
-        saveReviewObstacles(review.getId(), input.obstacleTypes());
+        saveReviewObstacles(review.getId(), input.obstacles());
         savePhotos(review.getId(), input.photoUrls());
 
         if (STATUS_APPROVED.equals(oldStatus)) {
@@ -213,10 +219,17 @@ public class UserReviewService {
             photosByReview.computeIfAbsent(photo.getReviewId(), k -> new ArrayList<>()).add(photo.getUrl());
         }
 
-        Map<UUID, List<String>> obstaclesByReview = new LinkedHashMap<>();
+        Map<UUID, List<ObstacleSeverityItem>> obstaclesByReview = new LinkedHashMap<>();
         for (ObstacleReviewObstacleEntity item : reviewObstacles.findByIdReviewIdIn(reviewIds)) {
             obstaclesByReview.computeIfAbsent(item.getId().getReviewId(), k -> new ArrayList<>())
-                    .add(item.getId().getObstacleType());
+                    .add(new ObstacleSeverityItem(
+                            item.getId().getObstacleType(),
+                            item.getSeverity()
+                    ));
+        }
+
+        for (List<ObstacleSeverityItem> items : obstaclesByReview.values()) {
+            items.sort((a, b) -> Integer.compare(obstacleOrder(a.obstacleType()), obstacleOrder(b.obstacleType())));
         }
 
         List<ReviewCardResp> out = new ArrayList<>();
@@ -227,7 +240,7 @@ public class UserReviewService {
             }
 
             List<String> itemPhotos = photosByReview.getOrDefault(review.getId(), List.of());
-            List<String> itemObstacles = obstaclesByReview.getOrDefault(review.getId(), List.of());
+            List<ObstacleSeverityItem> itemObstacles = obstaclesByReview.getOrDefault(review.getId(), List.of());
             int awardedPoints = STATUS_APPROVED.equals(review.getStatus())
                     ? calcPoints(review.getText(), itemPhotos)
                     : 0;
@@ -258,10 +271,11 @@ public class UserReviewService {
         return out;
     }
 
-    private void saveReviewObstacles(UUID reviewId, List<String> obstacleTypes) {
-        for (String obstacleType : obstacleTypes) {
+    private void saveReviewObstacles(UUID reviewId, List<ObstacleSeverityItem> obstacles) {
+        for (ObstacleSeverityItem item : obstacles) {
             ObstacleReviewObstacleEntity entity = new ObstacleReviewObstacleEntity();
-            entity.setId(new ObstacleReviewObstacleKey(reviewId, obstacleType));
+            entity.setId(new ObstacleReviewObstacleKey(reviewId, item.obstacleType()));
+            entity.setSeverity(item.severity());
             reviewObstacles.save(entity);
         }
     }
@@ -348,17 +362,17 @@ public class UserReviewService {
         }
 
         AddressReq address = validateAddress(req.address());
-        List<String> obstacleTypes = ObstacleType.normalizeMany(req.obstacleTypes());
+        List<ObstacleSeverityItem> obstacles = normalizeObstacles(req.obstacles());
         List<String> photoUrls = normalizePhotoUrls(req.photoUrls());
         String comment = blankToNull(req.comment());
-        String primaryObstacleType = choosePrimaryObstacleType(obstacleTypes);
+        String primaryObstacleType = choosePrimaryObstacleType(obstacles);
 
         return new ValidatedReviewInput(
                 req.latitude(),
                 req.longitude(),
                 address,
                 req.rating(),
-                obstacleTypes,
+                obstacles,
                 primaryObstacleType,
                 comment,
                 photoUrls
@@ -379,6 +393,45 @@ public class UserReviewService {
         return new AddressReq(country, region, localityType, city, street, house, placeName);
     }
 
+    private List<ObstacleSeverityItem> normalizeObstacles(List<ObstacleSeverityItem> rawItems) {
+        Map<String, Short> normalized = new LinkedHashMap<>();
+        for (String type : ObstacleType.allNames()) {
+            normalized.put(type, (short) 0);
+        }
+
+        if (rawItems != null) {
+            for (ObstacleSeverityItem rawItem : rawItems) {
+                if (rawItem == null) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE", "Bad obstacle");
+                }
+
+                String type = ObstacleType.normalize(rawItem.obstacleType());
+                short severity = rawItem.severity();
+                if (severity < 0 || severity > 3) {
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE_SEVERITY", "Bad obstacle severity");
+                }
+
+                normalized.put(type, severity);
+            }
+        }
+
+        boolean hasPositive = false;
+        List<ObstacleSeverityItem> out = new ArrayList<>();
+        for (String type : ObstacleType.allNames()) {
+            short severity = normalized.get(type);
+            if (severity > 0) {
+                hasPositive = true;
+            }
+            out.add(new ObstacleSeverityItem(type, severity));
+        }
+
+        if (!hasPositive) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "At least one obstacle must have positive severity");
+        }
+
+        return out;
+    }
+
     private List<String> normalizePhotoUrls(Collection<String> rawUrls) {
         List<String> out = new ArrayList<>();
         if (rawUrls == null) {
@@ -393,13 +446,28 @@ public class UserReviewService {
         return out;
     }
 
-    private String choosePrimaryObstacleType(List<String> obstacleTypes) {
-        for (String canonical : ObstacleType.allNames()) {
-            if (obstacleTypes.contains(canonical)) {
-                return canonical;
+    private String choosePrimaryObstacleType(List<ObstacleSeverityItem> obstacles) {
+        String bestType = null;
+        short bestSeverity = -1;
+
+        for (ObstacleSeverityItem item : obstacles) {
+            if (item.severity() > bestSeverity) {
+                bestSeverity = item.severity();
+                bestType = item.obstacleType();
             }
         }
-        return obstacleTypes.get(0);
+
+        if (bestType == null || bestSeverity <= 0) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "At least one obstacle must have positive severity");
+        }
+
+        return bestType;
+    }
+
+    private int obstacleOrder(String obstacleType) {
+        List<String> all = ObstacleType.allNames();
+        int index = all.indexOf(obstacleType);
+        return index >= 0 ? index : Integer.MAX_VALUE;
     }
 
     private UserEntity findCurrent(String phoneFromAuth) {
@@ -466,7 +534,7 @@ public class UserReviewService {
             double longitude,
             AddressReq address,
             short rating,
-            List<String> obstacleTypes,
+            List<ObstacleSeverityItem> obstacles,
             String primaryObstacleType,
             String comment,
             List<String> photoUrls
