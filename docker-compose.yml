@@ -31,7 +31,8 @@ services:
       ADMIN_PHONE: ${ADMIN_PHONE}
       ADMIN_PASS: ${ADMIN_PASS}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     logging:
       driver: "json-file"
       options:

@@ -27,10 +27,10 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .httpBasic(Customizer.withDefaults())
                 .authorizeHttpRequests(a -> a
-                        .requestMatchers("/api/auth/register").permitAll()
-                        .requestMatchers("/api/auth/login").permitAll()
-                        .requestMatchers("/api/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
-                        .requestMatchers("/api/moderators/**").hasRole("MODERATOR_ADMIN")
+                        .requestMatchers("/auth/register").permitAll()
+                        .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
+                        .requestMatchers("/moderators/**").hasRole("MODERATOR_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .build();

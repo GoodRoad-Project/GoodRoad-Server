@@ -99,6 +99,12 @@ public class AuthService {
         return toResp(u);
     }
 
+    public record ChangePassReq(
+            String phoneFromAuth,
+            String oldPassword,
+            String newPassword
+    ) {}
+
     @Transactional
     public void changePass(String phoneFromAuth, String oldPassword, String newPassword) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
