@@ -1,9 +1,12 @@
 package GoodRoad.users.moderators;
 
+import GoodRoad.database.UserEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
-@RequestMapping()
+@RequestMapping("/users/moderators")
 public class ModeratorController {
     private final ModeratorService service;
 
@@ -11,13 +14,25 @@ public class ModeratorController {
         this.service = service;
     }
 
-    @PostMapping("/users/moderators")
+    @PostMapping("")
     public String create(@RequestBody ModeratorService.createReq req) {
         return service.create(req.firstName(), req.lastName(), req.phone(), req.password());
     }
 
-    @PutMapping("users/moderators/{id}")
+    @PutMapping("/{id}")
     public void disable(@PathVariable String id) {
         service.disable(id);
     }
+
+    @GetMapping("/all")
+    public List<UserEntity> getAllModerators() {
+        return service.getAllModerators();
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteModerator(@PathVariable String id) {
+        service.deleteModerator(id);
+    }
+
+
 }

@@ -10,7 +10,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ModeratorService {
@@ -67,4 +69,29 @@ public class ModeratorService {
         u.setActive(false);
         users.save(u);
     }
+
+    @Transactional
+    public List<UserEntity> getAllModerators() {
+        return users.findAll().stream()
+                .filter(u -> Role.MODERATOR.name().equals(u.getRole()) || Role.MODERATOR_ADMIN.name().equals(u.getRole()))
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void deleteModerator(String id) {
+        UUID userId = UUID.fromString(id);
+        UserEntity u = users.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
+
+        if (Role.MODERATOR_ADMIN.name().equals(u.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "CANT_DELETE_ADMIN", "Cant delete admin moderator");
+        }
+
+        if (!Role.MODERATOR.name().equals(u.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "NOT_MODERATOR", "User is not a moderator");
+        }
+
+        users.delete(u);
+    }
+
 }
