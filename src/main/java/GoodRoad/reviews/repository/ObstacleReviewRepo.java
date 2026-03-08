@@ -1,4 +1,4 @@
-package GoodRoad.database;
+package GoodRoad.reviews.repository;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

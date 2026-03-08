@@ -1,4 +1,4 @@
-package GoodRoad.database;
+package GoodRoad.users.repository;
 
 import GoodRoad.api.ApiErrors.ApiException;
 import GoodRoad.auth.AuthService;

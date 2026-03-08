@@ -1,6 +1,6 @@
 package GoodRoad.users.moderators;
 
-import GoodRoad.database.UserEntity;
+import GoodRoad.users.repository.UserEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

@@ -1,8 +1,8 @@
 package GoodRoad.users.moderators;
 
 import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.database.UserEntity;
-import GoodRoad.database.UserRepo;
+import GoodRoad.users.repository.UserEntity;
+import GoodRoad.users.repository.UserRepo;
 import GoodRoad.model.Role;
 import GoodRoad.security.Crypto;
 import org.springframework.http.HttpStatus;

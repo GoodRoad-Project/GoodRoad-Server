@@ -1,6 +1,6 @@
 package GoodRoad.bootstrap;
 
-import GoodRoad.database.UserRepo;
+import GoodRoad.users.repository.UserRepo;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;

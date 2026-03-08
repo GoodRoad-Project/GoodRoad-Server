@@ -1,8 +1,8 @@
 package GoodRoad.auth;
 
 import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.database.UserEntity;
-import GoodRoad.database.UserRepo;
+import GoodRoad.users.repository.UserEntity;
+import GoodRoad.users.repository.UserRepo;
 import GoodRoad.security.Crypto;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;

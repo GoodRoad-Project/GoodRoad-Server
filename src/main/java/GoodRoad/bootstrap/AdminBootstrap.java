@@ -1,7 +1,7 @@
 package GoodRoad.bootstrap;
 
-import GoodRoad.database.UserEntity;
-import GoodRoad.database.UserRepo;
+import GoodRoad.users.repository.UserEntity;
+import GoodRoad.users.repository.UserRepo;
 import GoodRoad.model.Role;
 import GoodRoad.security.Crypto;
 import org.springframework.beans.factory.annotation.Value;

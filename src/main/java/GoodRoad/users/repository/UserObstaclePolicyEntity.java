@@ -1,4 +1,4 @@
-package GoodRoad.database;
+package GoodRoad.users.repository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
