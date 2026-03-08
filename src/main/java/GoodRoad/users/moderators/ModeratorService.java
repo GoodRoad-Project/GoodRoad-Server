@@ -1,4 +1,4 @@
-package GoodRoad.moderators;
+package GoodRoad.users.moderators;
 
 import GoodRoad.api.ApiErrors.ApiException;
 import GoodRoad.database.UserEntity;
@@ -22,6 +22,13 @@ public class ModeratorService {
         this.users = users;
         this.pe = pe;
     }
+
+    public record createReq(
+            String firstName,
+            String lastName,
+            String phone,
+            String password
+    ) {}
 
     @Transactional
     public String create(String firstName, String lastName, String phone, String password) {

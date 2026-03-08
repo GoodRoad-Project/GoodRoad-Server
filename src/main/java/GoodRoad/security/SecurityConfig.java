@@ -29,8 +29,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/auth/register").permitAll()
                         .requestMatchers("/auth/login").permitAll()
-                        .requestMatchers("/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
-                        .requestMatchers("/moderators/**").hasRole("MODERATOR_ADMIN")
+                        //.requestMatchers("/users/moderators/{id}").hasAnyRole("MODERATOR", "MODERATOR_ADMIN") // TODO: возможно пересмотреть права пользователей на этот ендпоинт
+                        .requestMatchers("/users/moderators/**").hasRole("MODERATOR_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .build();
