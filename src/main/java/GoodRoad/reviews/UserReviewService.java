@@ -94,14 +94,14 @@ public class UserReviewService {
     }
 
     @Transactional(readOnly = true)
-    public List<ReviewCardResp> listMine(String phoneFromAuth) {
+    public List<ReviewCardResp> listOwnReviews(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         List<ObstacleReviewEntity> mine = reviews.findByAuthorIdOrderByCreatedAtDesc(user.getId());
         return buildCards(mine);
     }
 
     @Transactional(readOnly = true)
-    public ReviewPointsResp points(String phoneFromAuth) {
+    public ReviewPointsResp getOwnReviewPoints(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         int total = normalizePoints(user.getTotalPoints());
         long approved = reviews.countByAuthorIdAndStatus(user.getId(), STATUS_APPROVED);
@@ -109,7 +109,7 @@ public class UserReviewService {
     }
 
     @Transactional
-    public ReviewCardResp create(String phoneFromAuth, UpsertReviewReq req) {
+    public ReviewCardResp createReview(String phoneFromAuth, UpsertReviewReq req) {
         UserEntity user = findCurrent(phoneFromAuth);
         ValidatedReviewInput input = validate(req);
         ObstacleFeatureEntity feature = resolveOrCreateFeature(input);
@@ -138,7 +138,7 @@ public class UserReviewService {
     }
 
     @Transactional
-    public ReviewCardResp updateMine(String phoneFromAuth, String reviewId, UpsertReviewReq req) {
+    public ReviewCardResp updateOwnReview(String phoneFromAuth, String reviewId, UpsertReviewReq req) {
         UserEntity user = findCurrent(phoneFromAuth);
         ObstacleReviewEntity review = findMineReview(user, reviewId);
 
@@ -180,7 +180,7 @@ public class UserReviewService {
     }
 
     @Transactional
-    public void deleteMine(String phoneFromAuth, String reviewId) {
+    public void deleteOwnReview(String phoneFromAuth, String reviewId) {
         UserEntity user = findCurrent(phoneFromAuth);
         ObstacleReviewEntity review = findMineReview(user, reviewId);
 
