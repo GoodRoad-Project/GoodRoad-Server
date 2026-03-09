@@ -1,6 +1,7 @@
 package GoodRoad.users.users;
 
 import GoodRoad.api.ApiErrors;
+import GoodRoad.security.Crypto;
 import GoodRoad.users.repository.UserEntity;
 import GoodRoad.users.repository.UserRepo;
 import GoodRoad.model.Role;
@@ -21,7 +22,7 @@ public class UserService {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName(); //вернет логин
         System.out.println("AUTH USERNAME = " + currentUsername);
 
-        UserEntity user = users.findByPhoneHash(currentUsername)
+        UserEntity user = users.findByPhoneHash(Crypto.sha256Hex(Crypto.normPhone(currentUsername)))
                 .orElseThrow(() -> new ApiErrors.ApiException(HttpStatus.NOT_FOUND, "NO_USER", "User not found"));
 
         if (!Role.USER.name().equals(user.getRole())) {
@@ -34,6 +35,4 @@ public class UserService {
 
         users.delete(user);
     }
-
-
 }

@@ -37,8 +37,8 @@ public class UserObstaclePolicyService { // тут храним логику д�
     }
 
     @Transactional(readOnly = true)
-    public List<PolicyItem> getCurrent(String phoneFromAuth) {
-        UserEntity user = findCurrent(phoneFromAuth);
+    public List<PolicyItem> getUserObstaclePolicies(String phoneFromAuth) {
+        UserEntity user = findCurrentUser(phoneFromAuth);
         Map<String, Short> byType = new HashMap<>();
         for (UserObstaclePolicyEntity entity : policies.findByIdUserId(user.getId())) {
             byType.put(entity.getId().getObstacleType(), entity.getMaxAllowedSeverity());
@@ -51,13 +51,17 @@ public class UserObstaclePolicyService { // тут храним логику д�
         return out;
     }
 
+    private List<PolicyItem> getCurrent(String phoneFromAuth) {
+        return getUserObstaclePolicies(phoneFromAuth);
+    }
+
     @Transactional
-    public List<PolicyItem> replaceCurrent(String phoneFromAuth, ReplacePolicyReq req) {
+    public List<PolicyItem> replaceUserObstaclePolicies(String phoneFromAuth, ReplacePolicyReq req) {
         if (req == null || req.items() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_POLICY", "Bad policy");
         }
 
-        UserEntity user = findCurrent(phoneFromAuth);
+        UserEntity user = findCurrentUser(phoneFromAuth);
         Long userId = user.getId();
         policies.deleteByIdUserId(userId);
 
@@ -88,7 +92,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
         return getCurrent(phoneFromAuth);
     }
 
-    private UserEntity findCurrent(String phoneFromAuth) {
+    private UserEntity findCurrentUser(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
