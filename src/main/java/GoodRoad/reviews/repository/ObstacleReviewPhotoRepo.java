@@ -11,6 +11,8 @@ public interface ObstacleReviewPhotoRepo extends JpaRepository<ObstacleReviewPho
 
     List<ObstacleReviewPhotoEntity> findByReviewIdIn(Collection<Long> reviewIds);
 
+    boolean existsByReviewId(Long reviewId);
+
     @Transactional
     void deleteByReviewId(Long reviewId);
 }

@@ -35,6 +35,9 @@ public class UserEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "total_points", nullable = false)
+    private Integer totalPoints = 0;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -50,6 +53,9 @@ public class UserEntity {
         }
         if (lastActiveAt == null) {
             lastActiveAt = now;
+        }
+        if (totalPoints == null || totalPoints < 0) {
+            totalPoints = 0;
         }
     }
 
@@ -115,6 +121,14 @@ public class UserEntity {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public Integer getTotalPoints() {
+        return totalPoints;
+    }
+
+    public void setTotalPoints(Integer totalPoints) {
+        this.totalPoints = totalPoints;
     }
 
     public Instant getCreatedAt() {

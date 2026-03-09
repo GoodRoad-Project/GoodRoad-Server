@@ -102,14 +102,9 @@ public class UserReviewService {
 
     @Transactional(readOnly = true)
     public ReviewPointsResp points(String phoneFromAuth) {
-        int total = 0;
-        long approved = 0;
-        for (ReviewCardResp item : listMine(phoneFromAuth)) {
-            if (STATUS_APPROVED.equals(item.status())) {
-                total += item.awardedPoints();
-                approved++;
-            }
-        }
+        UserEntity user = findCurrent(phoneFromAuth);
+        int total = normalizePoints(user.getTotalPoints());
+        long approved = reviews.countByAuthorIdAndStatus(user.getId(), STATUS_APPROVED);
         return new ReviewPointsResp(total, approved);
     }
 
@@ -130,6 +125,7 @@ public class UserReviewService {
         review.setText(input.comment());
         review.setCreatedAt(Instant.now());
         review.setStatus(STATUS_PENDING);
+        review.setAwardedPoints(0);
         reviews.save(review);
 
         saveReviewObstacles(review.getId(), input.obstacles());
@@ -245,7 +241,7 @@ public class UserReviewService {
             List<String> itemPhotos = photosByReview.getOrDefault(review.getId(), List.of());
             List<ObstacleSeverityItem> itemObstacles = obstaclesByReview.getOrDefault(review.getId(), List.of());
             int awardedPoints = STATUS_APPROVED.equals(review.getStatus())
-                    ? calcPoints(review.getText(), itemPhotos)
+                    ? normalizePoints(review.getAwardedPoints())
                     : 0;
 
             out.add(new ReviewCardResp(
@@ -494,20 +490,8 @@ public class UserReviewService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_REVIEW", "No review"));
     }
 
-    private int calcPoints(String comment, List<String> photoUrls) {
-        boolean hasComment = comment != null && !comment.isBlank();
-        boolean hasPhoto = photoUrls != null && !photoUrls.isEmpty();
-
-        if (hasPhoto && hasComment) {
-            return 20;
-        }
-        if (hasPhoto) {
-            return 15;
-        }
-        if (hasComment) {
-            return 10;
-        }
-        return 5;
+    private int normalizePoints(Integer value) {
+        return value == null || value < 0 ? 0 : value;
     }
 
     private Long parseId(String raw) {

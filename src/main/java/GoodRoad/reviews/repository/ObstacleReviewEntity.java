@@ -37,6 +37,9 @@ public class ObstacleReviewEntity {
     @Column(name = "status", nullable = false, length = 16)
     private String status;
 
+    @Column(name = "awarded_points", nullable = false)
+    private Integer awardedPoints = 0;
+
     @PrePersist
     private void prePersist() {
         if (createdAt == null) {
@@ -44,6 +47,9 @@ public class ObstacleReviewEntity {
         }
         if (status == null) {
             status = "PENDING";
+        }
+        if (awardedPoints == null || awardedPoints < 0) {
+            awardedPoints = 0;
         }
     }
 
@@ -101,5 +107,13 @@ public class ObstacleReviewEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Integer getAwardedPoints() {
+        return awardedPoints;
+    }
+
+    public void setAwardedPoints(Integer awardedPoints) {
+        this.awardedPoints = awardedPoints;
     }
 }

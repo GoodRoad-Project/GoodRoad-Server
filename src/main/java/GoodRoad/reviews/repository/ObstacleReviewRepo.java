@@ -20,6 +20,8 @@ public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, 
 
     long countByFeatureIdAndStatus(Long featureId, String status);
 
+    long countByAuthorIdAndStatus(Long authorId, String status);
+
     @Query("select avg(r.severity) from ObstacleReviewEntity r where r.featureId = :featureId and r.status = :status")
     Double avgSeverity(Long featureId, String status);
 
