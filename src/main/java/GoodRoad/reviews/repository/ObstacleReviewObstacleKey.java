@@ -5,13 +5,12 @@ import jakarta.persistence.Embeddable;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.UUID;
 
 @Embeddable
 public class ObstacleReviewObstacleKey implements Serializable { // аналогично с UserObstaclePolicyKey, ара ключей не должна дублироваться
 
     @Column(name = "review_id", nullable = false)
-    private UUID reviewId;
+    private Long reviewId;
 
     @Column(name = "obstacle_type", nullable = false, length = 32)
     private String obstacleType;
@@ -19,16 +18,16 @@ public class ObstacleReviewObstacleKey implements Serializable { // аналог
     public ObstacleReviewObstacleKey() {
     }
 
-    public ObstacleReviewObstacleKey(UUID reviewId, String obstacleType) {
+    public ObstacleReviewObstacleKey(Long reviewId, String obstacleType) {
         this.reviewId = reviewId;
         this.obstacleType = obstacleType;
     }
 
-    public UUID getReviewId() {
+    public Long getReviewId() {
         return reviewId;
     }
 
-    public void setReviewId(UUID reviewId) {
+    public void setReviewId(Long reviewId) {
         this.reviewId = reviewId;
     }
 

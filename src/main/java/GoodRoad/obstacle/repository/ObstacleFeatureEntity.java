@@ -2,19 +2,21 @@ package GoodRoad.obstacle.repository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "obstacle_feature")
 public class ObstacleFeatureEntity { // тут храним точку препятствия
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "type", nullable = false, length = 32)
     private String type;
@@ -55,11 +57,11 @@ public class ObstacleFeatureEntity { // тут храним точку преп�
     @Column(name = "last_reviewed_at")
     private Instant lastReviewedAt;
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

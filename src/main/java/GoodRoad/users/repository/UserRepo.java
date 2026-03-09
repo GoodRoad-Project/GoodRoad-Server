@@ -7,9 +7,8 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface UserRepo extends JpaRepository<UserEntity, UUID> {
+public interface UserRepo extends JpaRepository<UserEntity, Long> {
 
     Optional<UserEntity> findByPhoneHash(String phoneHash);
 

@@ -5,13 +5,12 @@ import jakarta.persistence.Embeddable;
 
 import java.io.Serializable;
 import java.util.Objects;
-import java.util.UUID;
 
 @Embeddable
 public class UserObstaclePolicyKey implements Serializable { // Тут у нас составной ключ, нужен, т.к. запись в таблице ser_obstacle_policy уникальна по паре полей
 
     @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    private Long userId;
 
     @Column(name = "obstacle_type", nullable = false, length = 32)
     private String obstacleType;
@@ -19,16 +18,16 @@ public class UserObstaclePolicyKey implements Serializable { // Тут у нас
     public UserObstaclePolicyKey() {
     }
 
-    public UserObstaclePolicyKey(UUID userId, String obstacleType) {
+    public UserObstaclePolicyKey(Long userId, String obstacleType) {
         this.userId = userId;
         this.obstacleType = obstacleType;
     }
 
-    public UUID getUserId() {
+    public Long getUserId() {
         return userId;
     }
 
-    public void setUserId(UUID userId) {
+    public void setUserId(Long userId) {
         this.userId = userId;
     }
 

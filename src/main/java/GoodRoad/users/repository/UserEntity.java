@@ -3,7 +3,6 @@ package GoodRoad.users.repository;
 import jakarta.persistence.*;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -11,8 +10,9 @@ import java.util.UUID;
 public class UserEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "first_name", length = 80)
     private String firstName;
@@ -53,11 +53,11 @@ public class UserEntity {
         }
     }
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(Long id) {
         this.id = id;
     }
 

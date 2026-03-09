@@ -12,7 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Component
 public class AdminBootstrap implements ApplicationRunner { // инициализируем админа-модератора при старте приложения
@@ -50,7 +49,6 @@ public class AdminBootstrap implements ApplicationRunner { // инициализ
         Instant now = Instant.now();
 
         UserEntity u = new UserEntity();
-        u.setId(UUID.randomUUID());
         u.setFirstName(null);
         u.setLastName(null);
         u.setPhoneHash(phoneHash);

@@ -2,22 +2,24 @@ package GoodRoad.reviews.repository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Entity
 @Table(name = "obstacle_review_photo")
 public class ObstacleReviewPhotoEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
-    private UUID id;
+    private Long id;
 
     @Column(name = "review_id", nullable = false)
-    private UUID reviewId;
+    private Long reviewId;
 
     @Column(name = "url", nullable = false, length = 512)
     private String url;
@@ -25,19 +27,19 @@ public class ObstacleReviewPhotoEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    public UUID getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(UUID id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
-    public UUID getReviewId() {
+    public Long getReviewId() {
         return reviewId;
     }
 
-    public void setReviewId(UUID reviewId) {
+    public void setReviewId(Long reviewId) {
         this.reviewId = reviewId;
     }
 

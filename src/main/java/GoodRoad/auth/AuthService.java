@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -64,7 +63,6 @@ public class AuthService {
         Instant now = Instant.now();
 
         UserEntity u = new UserEntity();
-        u.setId(UUID.randomUUID());
         u.setFirstName(req.firstName());
         u.setLastName(req.lastName());
         u.setPhoneHash(phoneHash);
@@ -84,13 +82,13 @@ public class AuthService {
         String phoneHash = Crypto.sha256Hex(phoneNorm);
 
         UserEntity u = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDS", "Bad credentials"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDITS", "Bad credentials"));
 
         if (!u.isActive()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
         }
         if (!pe.matches(req.password(), u.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDS", "Bad credentials");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDITS", "Bad credentials");
         }
 
         u.setLastActiveAt(Instant.now());

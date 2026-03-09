@@ -45,4 +45,8 @@ Thumbs.db
 # Spring Boot
 spring-boot-app.jar
 
+# Env
 .env
+
+# Gradle
+.gradle

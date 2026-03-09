@@ -5,13 +5,12 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.UUID;
 
-public interface ObstacleReviewPhotoRepo extends JpaRepository<ObstacleReviewPhotoEntity, UUID> {
-    List<ObstacleReviewPhotoEntity> findByReviewId(UUID reviewId);
+public interface ObstacleReviewPhotoRepo extends JpaRepository<ObstacleReviewPhotoEntity, Long> {
+    List<ObstacleReviewPhotoEntity> findByReviewId(Long reviewId);
 
-    List<ObstacleReviewPhotoEntity> findByReviewIdIn(Collection<UUID> reviewIds);
+    List<ObstacleReviewPhotoEntity> findByReviewIdIn(Collection<Long> reviewIds);
 
     @Transactional
-    void deleteByReviewId(UUID reviewId);
+    void deleteByReviewId(Long reviewId);
 }

@@ -17,7 +17,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @SuppressWarnings("DuplicatedCode")
 @Service
@@ -59,7 +58,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
         }
 
         UserEntity user = findCurrent(phoneFromAuth);
-        UUID userId = user.getId();
+        Long userId = user.getId();
         policies.deleteByIdUserId(userId);
 
         Map<String, PolicyItem> normalized = new HashMap<>();

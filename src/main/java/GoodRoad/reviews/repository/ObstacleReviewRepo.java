@@ -8,22 +8,21 @@ import org.springframework.data.jpa.repository.Query;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, UUID> { // для фото отзывов
+public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, Long> { // для фото отзывов
     Page<ObstacleReviewEntity> findByStatus(String status, Pageable pageable);
 
-    Optional<ObstacleReviewEntity> findByFeatureIdAndAuthorId(UUID featureId, UUID authorId);
+    Optional<ObstacleReviewEntity> findByFeatureIdAndAuthorId(Long featureId, Long authorId);
 
-    Optional<ObstacleReviewEntity> findByIdAndAuthorId(UUID id, UUID authorId);
+    Optional<ObstacleReviewEntity> findByIdAndAuthorId(Long id, Long authorId);
 
-    List<ObstacleReviewEntity> findByAuthorIdOrderByCreatedAtDesc(UUID authorId);
+    List<ObstacleReviewEntity> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 
-    long countByFeatureIdAndStatus(UUID featureId, String status);
+    long countByFeatureIdAndStatus(Long featureId, String status);
 
     @Query("select avg(r.severity) from ObstacleReviewEntity r where r.featureId = :featureId and r.status = :status")
-    Double avgSeverity(UUID featureId, String status);
+    Double avgSeverity(Long featureId, String status);
 
     @Query("select max(r.createdAt) from ObstacleReviewEntity r where r.featureId = :featureId and r.status = :status")
-    Instant lastAt(UUID featureId, String status);
+    Instant lastAt(Long featureId, String status);
 }

@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,7 +44,6 @@ public class ModeratorService {
         }
 
         UserEntity u = new UserEntity();
-        u.setId(UUID.randomUUID());
         u.setFirstName(firstName);
         u.setLastName(lastName);
         u.setPhoneHash(phoneHash);
@@ -58,7 +56,7 @@ public class ModeratorService {
 
     @Transactional
     public void disable(String id) {
-        UUID userId = UUID.fromString(id);
+        Long userId = parseId(id);
         UserEntity u = users.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
 
@@ -79,7 +77,7 @@ public class ModeratorService {
 
     @Transactional
     public void deleteModerator(String id) {
-        UUID userId = UUID.fromString(id);
+        Long userId = parseId(id);
         UserEntity u = users.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
 
@@ -92,6 +90,14 @@ public class ModeratorService {
         }
 
         users.delete(u);
+    }
+
+    private Long parseId(String raw) {
+        try {
+            return Long.parseLong(raw);
+        } catch (NumberFormatException e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+        }
     }
 
 }

@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class UserReviewService {
@@ -125,7 +124,6 @@ public class UserReviewService {
         }
 
         ObstacleReviewEntity review = new ObstacleReviewEntity();
-        review.setId(UUID.randomUUID());
         review.setFeatureId(feature.getId());
         review.setAuthorId(user.getId());
         review.setSeverity(input.rating());
@@ -149,7 +147,7 @@ public class UserReviewService {
         ObstacleReviewEntity review = findMineReview(user, reviewId);
 
         String oldStatus = review.getStatus();
-        UUID oldFeatureId = review.getFeatureId();
+        Long oldFeatureId = review.getFeatureId();
 
         ValidatedReviewInput input = validate(req);
         ObstacleFeatureEntity feature = resolveOrCreateFeature(input);
@@ -191,7 +189,7 @@ public class UserReviewService {
         ObstacleReviewEntity review = findMineReview(user, reviewId);
 
         String oldStatus = review.getStatus();
-        UUID featureId = review.getFeatureId();
+        Long featureId = review.getFeatureId();
         reviews.delete(review);
 
         if (STATUS_APPROVED.equals(oldStatus)) {
@@ -207,24 +205,24 @@ public class UserReviewService {
             return List.of();
         }
 
-        List<UUID> reviewIds = new ArrayList<>();
-        List<UUID> featureIds = new ArrayList<>();
+        List<Long> reviewIds = new ArrayList<>();
+        List<Long> featureIds = new ArrayList<>();
         for (ObstacleReviewEntity review : rawReviews) {
             reviewIds.add(review.getId());
             featureIds.add(review.getFeatureId());
         }
 
-        Map<UUID, ObstacleFeatureEntity> featureById = new HashMap<>();
+        Map<Long, ObstacleFeatureEntity> featureById = new HashMap<>();
         for (ObstacleFeatureEntity feature : features.findAllById(featureIds)) {
             featureById.put(feature.getId(), feature);
         }
 
-        Map<UUID, List<String>> photosByReview = new LinkedHashMap<>();
+        Map<Long, List<String>> photosByReview = new LinkedHashMap<>();
         for (ObstacleReviewPhotoEntity photo : photos.findByReviewIdIn(reviewIds)) {
             photosByReview.computeIfAbsent(photo.getReviewId(), k -> new ArrayList<>()).add(photo.getUrl());
         }
 
-        Map<UUID, List<ObstacleSeverityItem>> obstaclesByReview = new LinkedHashMap<>();
+        Map<Long, List<ObstacleSeverityItem>> obstaclesByReview = new LinkedHashMap<>();
         for (ObstacleReviewObstacleEntity item : reviewObstacles.findByIdReviewIdIn(reviewIds)) {
             obstaclesByReview.computeIfAbsent(item.getId().getReviewId(), k -> new ArrayList<>())
                     .add(new ObstacleSeverityItem(
@@ -276,7 +274,7 @@ public class UserReviewService {
         return out;
     }
 
-    private void saveReviewObstacles(UUID reviewId, List<ObstacleSeverityItem> obstacles) {
+    private void saveReviewObstacles(Long reviewId, List<ObstacleSeverityItem> obstacles) {
         for (ObstacleSeverityItem item : obstacles) {
             ObstacleReviewObstacleEntity entity = new ObstacleReviewObstacleEntity();
             entity.setId(new ObstacleReviewObstacleKey(reviewId, item.obstacleType()));
@@ -285,10 +283,9 @@ public class UserReviewService {
         }
     }
 
-    private void savePhotos(UUID reviewId, List<String> photoUrls) {
+    private void savePhotos(Long reviewId, List<String> photoUrls) {
         for (String url : photoUrls) {
             ObstacleReviewPhotoEntity photo = new ObstacleReviewPhotoEntity();
-            photo.setId(UUID.randomUUID());
             photo.setReviewId(reviewId);
             photo.setUrl(url);
             photo.setCreatedAt(Instant.now());
@@ -315,8 +312,11 @@ public class UserReviewService {
             return feature;
         }
 
+        return createFeature(input);
+    }
+
+    private ObstacleFeatureEntity createFeature(ValidatedReviewInput input) {
         ObstacleFeatureEntity created = new ObstacleFeatureEntity();
-        created.setId(UUID.randomUUID());
         created.setType(input.primaryObstacleType());
         created.setLat(input.latitude());
         created.setLon(input.longitude());
@@ -334,7 +334,7 @@ public class UserReviewService {
         return created;
     }
 
-    private void recomputeFeatureAggregate(UUID featureId) {
+    private void recomputeFeatureAggregate(Long featureId) {
         ObstacleFeatureEntity f = features.findById(featureId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature"));
 
@@ -462,7 +462,7 @@ public class UserReviewService {
             }
         }
 
-        if (bestType == null || bestSeverity <= 0) {
+        if (bestType == null || bestSeverity == 0) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "At least one obstacle must have positive severity");
         }
 
@@ -489,7 +489,7 @@ public class UserReviewService {
     }
 
     private ObstacleReviewEntity findMineReview(UserEntity user, String reviewId) {
-        UUID id = parseUuid(reviewId);
+        Long id = parseId(reviewId);
         return reviews.findByIdAndAuthorId(id, user.getId())
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_REVIEW", "No review"));
     }
@@ -510,10 +510,10 @@ public class UserReviewService {
         return 5;
     }
 
-    private UUID parseUuid(String raw) {
+    private Long parseId(String raw) {
         try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException e) {
+            return Long.parseLong(raw);
+        } catch (NumberFormatException e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
         }
     }

@@ -5,9 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
-public interface ObstacleFeatureRepo extends JpaRepository<ObstacleFeatureEntity, UUID> {
+public interface ObstacleFeatureRepo extends JpaRepository<ObstacleFeatureEntity, Long> {
 
     @Query("""
             select f
