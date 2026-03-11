@@ -40,6 +40,21 @@ public class ObstacleReviewEntity {
     @Column(name = "awarded_points", nullable = false)
     private Integer awardedPoints = 0;
 
+    @Column(name = "taken_by_moderator_id")
+    private Long takenByModeratorId;
+
+    @Column(name = "taken_at")
+    private Instant takenAt;
+
+    @Column(name = "moderated_by")
+    private Long moderatedBy;
+
+    @Column(name = "moderated_at")
+    private Instant moderatedAt;
+
+    @Column(name = "moderator_comment", length = 1000)
+    private String moderatorComment;
+
     @PrePersist
     private void prePersist() {
         if (createdAt == null) {
@@ -115,5 +130,45 @@ public class ObstacleReviewEntity {
 
     public void setAwardedPoints(Integer awardedPoints) {
         this.awardedPoints = awardedPoints;
+    }
+
+    public Long getTakenByModeratorId() {
+        return takenByModeratorId;
+    }
+
+    public void setTakenByModeratorId(Long takenByModeratorId) {
+        this.takenByModeratorId = takenByModeratorId;
+    }
+
+    public Instant getTakenAt() {
+        return takenAt;
+    }
+
+    public void setTakenAt(Instant takenAt) {
+        this.takenAt = takenAt;
+    }
+
+    public Long getModeratedBy() {
+        return moderatedBy;
+    }
+
+    public void setModeratedBy(Long moderatedBy) {
+        this.moderatedBy = moderatedBy;
+    }
+
+    public Instant getModeratedAt() {
+        return moderatedAt;
+    }
+
+    public void setModeratedAt(Instant moderatedAt) {
+        this.moderatedAt = moderatedAt;
+    }
+
+    public String getModeratorComment() {
+        return moderatorComment;
+    }
+
+    public void setModeratorComment(String moderatorComment) {
+        this.moderatorComment = moderatorComment;
     }
 }

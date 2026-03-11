@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,25 +24,29 @@ public class UserReviewService {
 
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_APPROVED = "APPROVED";
+    private static final String STATUS_REJECTED = "REJECTED";
 
     private final UserRepo users;
     private final ObstacleFeatureRepo features;
     private final ObstacleReviewRepo reviews;
     private final ObstacleReviewPhotoRepo photos;
     private final ObstacleReviewObstacleRepo reviewObstacles;
+    private final ReviewSupportService reviewSupport;
 
     public UserReviewService(
             UserRepo users,
             ObstacleFeatureRepo features,
             ObstacleReviewRepo reviews,
             ObstacleReviewPhotoRepo photos,
-            ObstacleReviewObstacleRepo reviewObstacles
+            ObstacleReviewObstacleRepo reviewObstacles,
+            ReviewSupportService reviewSupport
     ) {
         this.users = users;
         this.features = features;
         this.reviews = reviews;
         this.photos = photos;
         this.reviewObstacles = reviewObstacles;
+        this.reviewSupport = reviewSupport;
     }
 
     public record AddressReq(
@@ -86,7 +89,8 @@ public class UserReviewService {
             List<String> photoUrls,
             String status,
             Instant createdAt,
-            int awardedPoints
+            int awardedPoints,
+            String moderatorComment
     ) {
     }
 
@@ -155,10 +159,18 @@ public class UserReviewService {
                     });
         }
 
+        int oldAwardedPoints = normalizePoints(review.getAwardedPoints());
+
         review.setFeatureId(feature.getId());
         review.setSeverity(input.rating());
         review.setText(input.comment());
         review.setStatus(STATUS_PENDING);
+        review.setAwardedPoints(0);
+        review.setTakenByModeratorId(null);
+        review.setTakenAt(null);
+        review.setModeratedBy(null);
+        review.setModeratedAt(null);
+        review.setModeratorComment(null);
         reviews.save(review);
 
         reviewObstacles.deleteByIdReviewId(review.getId());
@@ -167,9 +179,12 @@ public class UserReviewService {
         savePhotos(review.getId(), input.photoUrls());
 
         if (STATUS_APPROVED.equals(oldStatus)) {
-            recomputeFeatureAggregate(oldFeatureId);
+            if (oldAwardedPoints > 0) {
+                user.setTotalPoints(safeSubtractPoints(user.getTotalPoints(), oldAwardedPoints));
+            }
+            reviewSupport.recomputeFeatureAggregate(oldFeatureId);
             if (!oldFeatureId.equals(feature.getId())) {
-                recomputeFeatureAggregate(feature.getId());
+                reviewSupport.recomputeFeatureAggregate(feature.getId());
             }
         }
 
@@ -189,7 +204,7 @@ public class UserReviewService {
         reviews.delete(review);
 
         if (STATUS_APPROVED.equals(oldStatus)) {
-            recomputeFeatureAggregate(featureId);
+            reviewSupport.recomputeFeatureAggregate(featureId);
         }
 
         user.setLastActiveAt(Instant.now());
@@ -197,39 +212,11 @@ public class UserReviewService {
     }
 
     private List<ReviewCardResp> buildCards(List<ObstacleReviewEntity> rawReviews) {
-        if (rawReviews.isEmpty()) {
-            return List.of();
-        }
+        ReviewSupportService.ReviewBundle bundle = reviewSupport.loadBundle(rawReviews);
 
-        List<Long> reviewIds = new ArrayList<>();
-        List<Long> featureIds = new ArrayList<>();
-        for (ObstacleReviewEntity review : rawReviews) {
-            reviewIds.add(review.getId());
-            featureIds.add(review.getFeatureId());
-        }
-
-        Map<Long, ObstacleFeatureEntity> featureById = new HashMap<>();
-        for (ObstacleFeatureEntity feature : features.findAllById(featureIds)) {
-            featureById.put(feature.getId(), feature);
-        }
-
-        Map<Long, List<String>> photosByReview = new LinkedHashMap<>();
-        for (ObstacleReviewPhotoEntity photo : photos.findByReviewIdIn(reviewIds)) {
-            photosByReview.computeIfAbsent(photo.getReviewId(), k -> new ArrayList<>()).add(photo.getUrl());
-        }
-
-        Map<Long, List<ObstacleSeverityItem>> obstaclesByReview = new LinkedHashMap<>();
-        for (ObstacleReviewObstacleEntity item : reviewObstacles.findByIdReviewIdIn(reviewIds)) {
-            obstaclesByReview.computeIfAbsent(item.getId().getReviewId(), k -> new ArrayList<>())
-                    .add(new ObstacleSeverityItem(
-                            item.getId().getObstacleType(),
-                            item.getSeverity()
-                    ));
-        }
-
-        for (List<ObstacleSeverityItem> items : obstaclesByReview.values()) {
-            items.sort((a, b) -> Integer.compare(obstacleOrder(a.obstacleType()), obstacleOrder(b.obstacleType())));
-        }
+        Map<Long, ObstacleFeatureEntity> featureById = bundle.featureById();
+        Map<Long, List<String>> photosByReview = bundle.photosByReview();
+        Map<Long, List<ObstacleSeverityItem>> obstaclesByReview = buildObstaclesByReview(bundle);
 
         List<ReviewCardResp> out = new ArrayList<>();
         for (ObstacleReviewEntity review : rawReviews) {
@@ -264,10 +251,26 @@ public class UserReviewService {
                     itemPhotos,
                     review.getStatus(),
                     review.getCreatedAt(),
-                    awardedPoints
+                    awardedPoints,
+                    review.getModeratorComment()
             ));
         }
         return out;
+    }
+
+    private Map<Long, List<ObstacleSeverityItem>> buildObstaclesByReview(ReviewSupportService.ReviewBundle bundle) {
+        Map<Long, List<ObstacleSeverityItem>> obstaclesByReview = new LinkedHashMap<>();
+        for (Map.Entry<Long, List<ReviewSupportService.ReviewObstacleItem>> entry : bundle.obstaclesByReview().entrySet()) {
+            List<ObstacleSeverityItem> items = new ArrayList<>();
+            for (ReviewSupportService.ReviewObstacleItem item : entry.getValue()) {
+                items.add(new ObstacleSeverityItem(
+                        item.obstacleType(),
+                        item.severity()
+                ));
+            }
+            obstaclesByReview.put(entry.getKey(), items);
+        }
+        return obstaclesByReview;
     }
 
     private void saveReviewObstacles(Long reviewId, List<ObstacleSeverityItem> obstacles) {
@@ -328,27 +331,6 @@ public class UserReviewService {
         created.setLastReviewedAt(null);
         features.save(created);
         return created;
-    }
-
-    private void recomputeFeatureAggregate(Long featureId) {
-        ObstacleFeatureEntity f = features.findById(featureId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature"));
-
-        long cnt = reviews.countByFeatureIdAndStatus(featureId, STATUS_APPROVED);
-        Double avg = reviews.avgSeverity(featureId, STATUS_APPROVED);
-        Instant last = reviews.lastAt(featureId, STATUS_APPROVED);
-
-        f.setReviewsCount((int) cnt);
-        f.setLastReviewedAt(last);
-
-        if (avg == null || cnt == 0) {
-            f.setSeverityEst(null);
-        } else {
-            short est = (short) Math.max(1, Math.min(5, Math.round(avg.floatValue())));
-            f.setSeverityEst(est);
-        }
-
-        features.save(f);
     }
 
     private ValidatedReviewInput validate(UpsertReviewReq req) {
@@ -465,12 +447,6 @@ public class UserReviewService {
         return bestType;
     }
 
-    private int obstacleOrder(String obstacleType) {
-        List<String> all = ObstacleType.allNames();
-        int index = all.indexOf(obstacleType);
-        return index >= 0 ? index : Integer.MAX_VALUE;
-    }
-
     private UserEntity findCurrent(String phoneFromAuth) {
         return users.findByPhoneHash(currentPhoneHash(phoneFromAuth))
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
@@ -492,6 +468,13 @@ public class UserReviewService {
 
     private int normalizePoints(Integer value) {
         return value == null || value < 0 ? 0 : value;
+    }
+
+    private int safeSubtractPoints(Integer currentValue, int delta) {
+        int current = normalizePoints(currentValue);
+        int safeDelta = Math.max(delta, 0);
+        int next = current - safeDelta;
+        return Math.max(next, 0);
     }
 
     private Long parseId(String raw) {
