@@ -32,6 +32,8 @@ public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, 
 
     List<ObstacleReviewEntity> findByAuthorIdOrderByCreatedAtDesc(Long authorId);
 
+    List<ObstacleReviewEntity> findByFeatureIdAndStatusOrderByCreatedAtDesc(Long featureId, String status);
+
     long countByFeatureIdAndStatus(Long featureId, String status);
 
     long countByAuthorIdAndStatus(Long authorId, String status);
