@@ -1,0 +1,558 @@
+{
+  "info": {
+    "_postman_id": "c161f3cb-0341-445e-a3f4-92b808af715a",
+    "name": "New Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "52870881"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"firstName\": \"Ivan\",\r\n  \"lastName\": \"Ivanov\",\r\n  \"phone\": \"+79128870198\",\r\n  \"password\": \"password\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/auth/register",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"phone\": \"+79128870198\",\r\n  \"password\": \"password\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/auth/login",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "create moderator",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {\r",
+              "    pm.response.to.have.status(200);\r",
+              "});\r",
+              "\r",
+              "pm.test(\"Response contains moderator id\", function () {\r",
+              "    const response = pm.response.text();\r",
+              "    pm.expect(response).to.not.be.empty;\r",
+              "});"
+            ],
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
+          }
+        }
+      ],
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "password",
+              "value": "{{pass}}",
+              "type": "string"
+            },
+            {
+              "key": "username",
+              "value": "+71234567890",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"firstName\": \"Ivan\",\r\n  \"lastName\": \"Ivanov\",\r\n  \"phone\": \"+79128870197\",\r\n  \"password\": \"password\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/users/moderators",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "moderators"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "disable",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "password",
+              "value": "medpass",
+              "type": "string"
+            },
+            {
+              "key": "username",
+              "value": "+71234567890",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"phone\": \"+79128870195\",\r\n  \"password\": \"password\"\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/users/moderators/9e9b7fc9-052c-48e4-b8cd-2fc91c7048e2",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "moderators",
+            "9e9b7fc9-052c-48e4-b8cd-2fc91c7048e2"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get moderators",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "password",
+              "value": "medpass",
+              "type": "string"
+            },
+            {
+              "key": "username",
+              "value": "+71234567890",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/moderators/all",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "moderators",
+            "all"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete moderator",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "password",
+              "value": "medpass",
+              "type": "string"
+            },
+            {
+              "key": "username",
+              "value": "+71234567890",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/moderators/67266277-c3ac-4b81-9e08-23cc0ed87ee6",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "moderators",
+            "67266277-c3ac-4b81-9e08-23cc0ed87ee6"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete uiser",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "get obstacles",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/users/obstacles",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "obstacles"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "getOwnReviews",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/reviews/own",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "reviews",
+            "own"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "getOwnReviewPoints",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:8080/reviews/points",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "reviews",
+            "points"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "createReview",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"latitude\": 55.751244,\r\n  \"longitude\": 37.618423,\r\n  \"address\": {\r\n    \"country\": \"Russia\",\r\n    \"region\": \"Moscow Oblast\",\r\n    \"localityType\": \"City\",\r\n    \"city\": \"Moscow\",\r\n    \"street\": \"Lenina\",\r\n    \"house\": \"10\",\r\n    \"placeName\": \"Near Red Square\"\r\n  },\r\n  \"rating\": 3,\r\n  \"obstacles\": [\r\n    {\"obstacleType\": \"POTHOLES\", \"severity\": 2}\r\n  ],\r\n  \"comment\": \"Все плохо\",\r\n  \"photoUrls\": [\"https://example.com/photo1.jpg\"]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/reviews",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "reviews"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "update review",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"latitude\": 55.751244,\r\n  \"longitude\": 37.618423,\r\n  \"address\": {\r\n    \"country\": \"Russia\",\r\n    \"region\": \"Moscow Oblast\",\r\n    \"localityType\": \"City\",\r\n    \"city\": \"Moscow\",\r\n    \"street\": \"Lenina\",\r\n    \"house\": \"10\",\r\n    \"placeName\": \"Near Red Square\"\r\n  },\r\n  \"rating\": 3,\r\n  \"obstacles\": [\r\n    {\"obstacleType\": \"POTHOLES\", \"severity\": 2}\r\n  ],\r\n  \"comment\": \"Обновленный комментарий после проверки дороги\",\r\n  \"photoUrls\": [\r\n    \"https://example.com/photo1.jpg\",\r\n    \"https://example.com/photo2.jpg\"\r\n  ]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/reviews/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "reviews",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "put user obstacles",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n  \"items\": [\r\n    {\r\n      \"obstacleType\": \"POTHOLES\",\r\n      \"selected\": true,\r\n      \"maxAllowedSeverity\": 2\r\n    },\r\n    {\r\n      \"obstacleType\": \"SAND\",\r\n      \"selected\": false,\r\n      \"maxAllowedSeverity\": 1\r\n    }\r\n  ]\r\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://localhost:8080/users/obstacles",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "users",
+            "obstacles"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "delete review",
+      "request": {
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "+79128870198",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "password",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "url": {
+          "raw": "http://localhost:8080/reviews/1",
+          "protocol": "http",
+          "host": [
+            "localhost"
+          ],
+          "port": "8080",
+          "path": [
+            "reviews",
+            "1"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
