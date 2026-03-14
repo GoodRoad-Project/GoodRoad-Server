@@ -1,4 +1,4 @@
-package com.example.goodroad.features.network.models
+package com.GoodRoad.model
 
 import com.fasterxml.jackson.annotation.JsonProperty
 
@@ -28,7 +28,6 @@ data class RouteRequest(
     @JsonProperty("avoid_surfaces")
     val avoidSurfaceTypes: List<String> = emptyList(),  // "SAND", "GRAVEL"
 
-    // 👇 ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ
     val locale: String = "ru",                    // язык инструкций
     @JsonProperty("alternatives")
     val needAlternatives: Boolean = true,          // нужны ли альтернативы

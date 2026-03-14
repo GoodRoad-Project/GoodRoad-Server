@@ -1,4 +1,4 @@
-package com.goodroad.model.gh
+package com.GoodRoad.model.gh
 
 import com.fasterxml.jackson.annotation.JsonProperty
 

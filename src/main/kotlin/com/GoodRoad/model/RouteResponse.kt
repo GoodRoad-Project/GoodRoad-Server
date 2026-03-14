@@ -1,4 +1,4 @@
-package com.goodroad.model
+package com.GoodRoad.model
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import java.time.Duration
