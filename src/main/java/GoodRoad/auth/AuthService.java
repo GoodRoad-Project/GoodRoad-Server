@@ -16,11 +16,11 @@ import java.time.Instant;
 public class AuthService {
 
     private final UserRepo users;
-    private final PasswordEncoder pe;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepo users, PasswordEncoder pe) {
+    public AuthService(UserRepo users, PasswordEncoder passwordEncoder) {
         this.users = users;
-        this.pe = pe;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public record RegisterReq(
@@ -52,12 +52,12 @@ public class AuthService {
     public AuthResp register(RegisterReq req) {
         String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PHONE", "Bad phone");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         if (users.findByPhoneHash(phoneHash).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "PHONE_USED", "Phone already used");
+            throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_EXISTS", "Phone number already exists");
         }
 
         Instant now = Instant.now();
@@ -67,7 +67,7 @@ public class AuthService {
         u.setLastName(req.lastName());
         u.setPhoneHash(phoneHash);
         u.setRole("USER");
-        u.setPassHash(pe.encode(req.password()));
+        u.setPassHash(passwordEncoder.encode(req.password()));
         u.setActive(true);
         u.setCreatedAt(now);
         u.setLastActiveAt(now);
@@ -81,20 +81,20 @@ public class AuthService {
         String phoneNorm = Crypto.normPhone(req.phone());
         String phoneHash = Crypto.sha256Hex(phoneNorm);
 
-        UserEntity u = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDITS", "Bad credentials"));
+        UserEntity user = users.findByPhoneHash(phoneHash)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Invalid phone"));
 
-        if (!u.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
+        if (!user.isActive()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "Account inactive");
         }
-        if (!pe.matches(req.password(), u.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDITS", "Bad credentials");
+        if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Invalid password");
         }
 
-        u.setLastActiveAt(Instant.now());
-        users.save(u);
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
 
-        return toResp(u);
+        return toResp(user);
     }
 
     public record ChangePassReq(
@@ -117,11 +117,11 @@ public class AuthService {
         if (!u.isActive()) {
             throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
         }
-        if (!pe.matches(oldPassword, u.getPassHash())) {
+        if (!passwordEncoder.matches(oldPassword, u.getPassHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_OLD_PASS", "Bad old password");
         }
 
-        u.setPassHash(pe.encode(newPassword));
+        u.setPassHash(passwordEncoder.encode(newPassword));
         u.setLastActiveAt(Instant.now());
         users.save(u);
     }

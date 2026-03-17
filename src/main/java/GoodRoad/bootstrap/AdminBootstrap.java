@@ -17,18 +17,18 @@ import java.time.Instant;
 public class AdminBootstrap implements ApplicationRunner { // инициализируем админа-модератора при старте приложения
 
     private final UserRepo users;
-    private final PasswordEncoder pe;
+    private final PasswordEncoder passwordEncoder;
     private final String adminPhone;
     private final String adminPass;
 
     public AdminBootstrap(
             UserRepo users,
-            PasswordEncoder pe,
+            PasswordEncoder passwordEncoder,
             @Value("${app.admin.phone}") String adminPhone,
             @Value("${app.admin.pass}") String adminPass
     ) {
         this.users = users;
-        this.pe = pe;
+        this.passwordEncoder = passwordEncoder;
         this.adminPhone = adminPhone;
         this.adminPass = adminPass;
     }
@@ -53,7 +53,7 @@ public class AdminBootstrap implements ApplicationRunner { // инициализ
         u.setLastName(null);
         u.setPhoneHash(phoneHash);
         u.setRole(Role.MODERATOR_ADMIN.name());
-        u.setPassHash(pe.encode(adminPass));
+        u.setPassHash(passwordEncoder.encode(adminPass));
         u.setPhotoUrl(null);
         u.setActive(true);
         u.setCreatedAt(now);

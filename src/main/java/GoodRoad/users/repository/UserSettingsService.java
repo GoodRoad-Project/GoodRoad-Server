@@ -15,12 +15,12 @@ import java.time.Instant;
 public class UserSettingsService {
 
     private final UserRepo users;
-    private final PasswordEncoder pe;
+    private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
 
-    public UserSettingsService(UserRepo users, PasswordEncoder pe, AuthService authService) {
+    public UserSettingsService(UserRepo users, PasswordEncoder passwordEncoder, AuthService authService) {
         this.users = users;
-        this.pe = pe;
+        this.passwordEncoder = passwordEncoder;
         this.authService = authService;
     }
 
@@ -112,7 +112,7 @@ public class UserSettingsService {
         }
 
         UserEntity u = findCurrent(phoneFromAuth);
-        if (!pe.matches(req.password(), u.getPassHash())) {
+        if (!passwordEncoder.matches(req.password(), u.getPassHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDS", "Bad credentials");
         }
 

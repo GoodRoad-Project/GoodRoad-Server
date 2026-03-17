@@ -3,7 +3,7 @@ package GoodRoad.auth;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/auth") // тут возможно для более понятной и правильной иерархии нужно будет добавить сначала users
+@RequestMapping("/auth")
 public class AuthController {
 
     private final AuthService service;

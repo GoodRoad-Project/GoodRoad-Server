@@ -17,11 +17,11 @@ import java.util.stream.Collectors;
 public class ModeratorService {
 
     private final UserRepo users;
-    private final PasswordEncoder pe;
+    private final PasswordEncoder passwordEncoder;
 
-    public ModeratorService(UserRepo users, PasswordEncoder pe) {
+    public ModeratorService(UserRepo users, PasswordEncoder passwordEncoder) {
         this.users = users;
-        this.pe = pe;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public record createReq(
@@ -48,7 +48,7 @@ public class ModeratorService {
         u.setLastName(lastName);
         u.setPhoneHash(phoneHash);
         u.setRole(Role.MODERATOR.name());
-        u.setPassHash(pe.encode(password));
+        u.setPassHash(passwordEncoder.encode(password));
         u.setActive(true);
 
         return users.save(u).getId().toString();
