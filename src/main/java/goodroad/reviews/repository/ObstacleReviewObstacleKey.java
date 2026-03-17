@@ -1,4 +1,4 @@
-package GoodRoad.reviews.repository;
+package goodroad.reviews.repository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;

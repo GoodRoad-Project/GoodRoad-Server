@@ -1,4 +1,4 @@
-package GoodRoad.reviews;
+package goodroad.reviews;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;

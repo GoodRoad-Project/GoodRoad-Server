@@ -1,4 +1,4 @@
-package GoodRoad.model;
+package goodroad.model;
 
 public enum Role {
     USER,

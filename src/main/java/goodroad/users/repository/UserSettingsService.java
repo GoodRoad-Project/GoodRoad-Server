@@ -1,9 +1,9 @@
-package GoodRoad.users.repository;
+package goodroad.users.repository;
 
-import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.auth.AuthService;
-import GoodRoad.model.Role;
-import GoodRoad.security.Crypto;
+import goodroad.api.ApiErrors.ApiException;
+import goodroad.auth.AuthService;
+import goodroad.model.Role;
+import goodroad.security.Crypto;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

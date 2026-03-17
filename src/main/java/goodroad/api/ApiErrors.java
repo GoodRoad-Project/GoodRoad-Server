@@ -1,4 +1,4 @@
-package GoodRoad.api;
+package goodroad.api;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

@@ -1,4 +1,4 @@
-package GoodRoad.users.repository;
+package goodroad.users.repository;
 
 import jakarta.persistence.*;
 import lombok.Builder;

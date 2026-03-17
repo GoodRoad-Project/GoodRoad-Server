@@ -1,4 +1,4 @@
-package GoodRoad.obstacle;
+package goodroad.obstacle;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

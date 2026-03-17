@@ -1,4 +1,4 @@
-package GoodRoad.users.repository;
+package goodroad.users.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

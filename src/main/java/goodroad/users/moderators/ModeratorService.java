@@ -1,10 +1,10 @@
-package GoodRoad.users.moderators;
+package goodroad.users.moderators;
 
-import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.users.repository.UserEntity;
-import GoodRoad.users.repository.UserRepo;
-import GoodRoad.model.Role;
-import GoodRoad.security.Crypto;
+import goodroad.api.ApiErrors.ApiException;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
+import goodroad.model.Role;
+import goodroad.security.Crypto;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

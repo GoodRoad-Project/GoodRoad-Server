@@ -1,4 +1,4 @@
-package GoodRoad.security;
+package goodroad.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

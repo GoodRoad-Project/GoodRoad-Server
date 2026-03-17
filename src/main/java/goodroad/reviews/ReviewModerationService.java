@@ -1,14 +1,14 @@
-package GoodRoad.reviews;
+package goodroad.reviews;
 
-import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.model.Role;
-import GoodRoad.obstacle.repository.ObstacleFeatureEntity;
-import GoodRoad.reviews.repository.ObstacleReviewEntity;
-import GoodRoad.reviews.repository.ObstacleReviewPhotoRepo;
-import GoodRoad.reviews.repository.ObstacleReviewRepo;
-import GoodRoad.security.Crypto;
-import GoodRoad.users.repository.UserEntity;
-import GoodRoad.users.repository.UserRepo;
+import goodroad.api.ApiErrors.ApiException;
+import goodroad.model.Role;
+import goodroad.obstacle.repository.ObstacleFeatureEntity;
+import goodroad.reviews.repository.ObstacleReviewEntity;
+import goodroad.reviews.repository.ObstacleReviewPhotoRepo;
+import goodroad.reviews.repository.ObstacleReviewRepo;
+import goodroad.security.Crypto;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;

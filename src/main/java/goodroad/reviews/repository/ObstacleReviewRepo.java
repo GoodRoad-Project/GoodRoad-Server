@@ -1,4 +1,4 @@
-package GoodRoad.reviews.repository;
+package goodroad.reviews.repository;
 
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;

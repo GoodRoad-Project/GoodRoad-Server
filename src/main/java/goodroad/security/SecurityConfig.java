@@ -1,7 +1,7 @@
-package GoodRoad.security;
+package goodroad.security;
 
-import GoodRoad.users.repository.UserEntity;
-import GoodRoad.users.repository.UserRepo;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;

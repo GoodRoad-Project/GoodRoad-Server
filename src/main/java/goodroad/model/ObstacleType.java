@@ -1,6 +1,6 @@
-package GoodRoad.model;
+package goodroad.model;
 
-import GoodRoad.api.ApiErrors.ApiException;
+import goodroad.api.ApiErrors.ApiException;
 import org.springframework.http.HttpStatus;
 
 import java.util.ArrayList;

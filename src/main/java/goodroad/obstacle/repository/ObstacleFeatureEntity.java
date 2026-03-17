@@ -1,4 +1,4 @@
-package GoodRoad.obstacle.repository;
+package goodroad.obstacle.repository;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

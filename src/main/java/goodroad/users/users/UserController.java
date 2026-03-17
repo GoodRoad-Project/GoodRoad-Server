@@ -1,6 +1,6 @@
-package GoodRoad.users.users;
+package goodroad.users.users;
 
-import GoodRoad.users.repository.UserSettingsService;
+import goodroad.users.repository.UserSettingsService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 

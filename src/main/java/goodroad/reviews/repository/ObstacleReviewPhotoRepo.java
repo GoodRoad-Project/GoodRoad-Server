@@ -1,4 +1,4 @@
-package GoodRoad.reviews.repository;
+package goodroad.reviews.repository;
 
 import jakarta.transaction.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;

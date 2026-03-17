@@ -1,4 +1,4 @@
-package GoodRoad.auth;
+package goodroad.auth;
 
 import org.springframework.web.bind.annotation.*;
 

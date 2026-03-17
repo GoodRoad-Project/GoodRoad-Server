@@ -1,9 +1,9 @@
-package GoodRoad.bootstrap;
+package goodroad.bootstrap;
 
-import GoodRoad.users.repository.UserEntity;
-import GoodRoad.users.repository.UserRepo;
-import GoodRoad.model.Role;
-import GoodRoad.security.Crypto;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
+import goodroad.model.Role;
+import goodroad.security.Crypto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;

@@ -1,4 +1,4 @@
-package GoodRoad.users.moderators;
+package goodroad.users.moderators;
 
 import org.springframework.web.bind.annotation.*;
 

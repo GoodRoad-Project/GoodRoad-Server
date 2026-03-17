@@ -1,13 +1,13 @@
-package GoodRoad.obstacle;
+package goodroad.obstacle;
 
-import GoodRoad.api.ApiErrors.ApiException;
-import GoodRoad.model.ObstacleType;
-import GoodRoad.users.repository.UserObstaclePolicyEntity;
-import GoodRoad.users.repository.UserObstaclePolicyKey;
-import GoodRoad.users.repository.UserObstaclePolicyRepo;
-import GoodRoad.security.Crypto;
-import GoodRoad.users.repository.UserEntity;
-import GoodRoad.users.repository.UserRepo;
+import goodroad.api.ApiErrors.ApiException;
+import goodroad.model.ObstacleType;
+import goodroad.users.repository.UserObstaclePolicyEntity;
+import goodroad.users.repository.UserObstaclePolicyKey;
+import goodroad.users.repository.UserObstaclePolicyRepo;
+import goodroad.security.Crypto;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
