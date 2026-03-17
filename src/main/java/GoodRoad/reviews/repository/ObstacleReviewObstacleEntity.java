@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import lombok.Builder;
 
 @Entity
 @Table(name = "obstacle_review_obstacle")
@@ -14,6 +15,18 @@ public class ObstacleReviewObstacleEntity { // нужно для списка п
 
     @Column(name = "severity", nullable = false)
     private short severity;
+
+    public ObstacleReviewObstacleEntity() {
+    }
+
+    @Builder
+    public ObstacleReviewObstacleEntity(
+            ObstacleReviewObstacleKey id,
+            short severity
+    ) {
+        this.id = id;
+        this.severity = severity;
+    }
 
     public ObstacleReviewObstacleKey getId() {
         return id;

@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Builder;
 
 import java.time.Instant;
 
@@ -26,6 +27,20 @@ public class ObstacleReviewPhotoEntity {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
+
+    public ObstacleReviewPhotoEntity() {
+    }
+
+    @Builder
+    public ObstacleReviewPhotoEntity(
+            Long reviewId,
+            String url,
+            Instant createdAt
+    ) {
+        this.reviewId = reviewId;
+        this.url = url;
+        this.createdAt = createdAt;
+    }
 
     public Long getId() {
         return id;

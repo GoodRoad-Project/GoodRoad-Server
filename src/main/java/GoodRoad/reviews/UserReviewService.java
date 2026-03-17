@@ -122,14 +122,15 @@ public class UserReviewService {
             throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "Review already exists");
         }
 
-        ObstacleReviewEntity review = new ObstacleReviewEntity();
-        review.setFeatureId(feature.getId());
-        review.setAuthorId(user.getId());
-        review.setSeverity(input.rating());
-        review.setText(input.comment());
-        review.setCreatedAt(Instant.now());
-        review.setStatus(STATUS_PENDING);
-        review.setAwardedPoints(0);
+        ObstacleReviewEntity review = ObstacleReviewEntity.builder()
+                .featureId(feature.getId())
+                .authorId(user.getId())
+                .severity(input.rating())
+                .text(input.comment())
+                .createdAt(Instant.now())
+                .status(STATUS_PENDING)
+                .awardedPoints(0)
+                .build();
         reviews.save(review);
 
         saveReviewObstacles(review.getId(), input.obstacles());
@@ -275,19 +276,21 @@ public class UserReviewService {
 
     private void saveReviewObstacles(Long reviewId, List<ObstacleSeverityItem> obstacles) {
         for (ObstacleSeverityItem item : obstacles) {
-            ObstacleReviewObstacleEntity entity = new ObstacleReviewObstacleEntity();
-            entity.setId(new ObstacleReviewObstacleKey(reviewId, item.obstacleType()));
-            entity.setSeverity(item.severity());
+            ObstacleReviewObstacleEntity entity = ObstacleReviewObstacleEntity.builder()
+                    .id(new ObstacleReviewObstacleKey(reviewId, item.obstacleType()))
+                    .severity(item.severity())
+                    .build();
             reviewObstacles.save(entity);
         }
     }
 
     private void savePhotos(Long reviewId, List<String> photoUrls) {
         for (String url : photoUrls) {
-            ObstacleReviewPhotoEntity photo = new ObstacleReviewPhotoEntity();
-            photo.setReviewId(reviewId);
-            photo.setUrl(url);
-            photo.setCreatedAt(Instant.now());
+            ObstacleReviewPhotoEntity photo = ObstacleReviewPhotoEntity.builder()
+                    .reviewId(reviewId)
+                    .url(url)
+                    .createdAt(Instant.now())
+                    .build();
             photos.save(photo);
         }
     }
@@ -315,20 +318,21 @@ public class UserReviewService {
     }
 
     private ObstacleFeatureEntity createFeature(ValidatedReviewInput input) {
-        ObstacleFeatureEntity created = new ObstacleFeatureEntity();
-        created.setType(input.primaryObstacleType());
-        created.setLat(input.latitude());
-        created.setLon(input.longitude());
-        created.setCountry(input.address().country());
-        created.setRegion(input.address().region());
-        created.setLocalityType(input.address().localityType());
-        created.setCity(input.address().city());
-        created.setStreet(input.address().street());
-        created.setHouse(input.address().house());
-        created.setPlaceName(input.address().placeName());
-        created.setReviewsCount(0);
-        created.setSeverityEst(null);
-        created.setLastReviewedAt(null);
+        ObstacleFeatureEntity created = ObstacleFeatureEntity.builder()
+                .type(input.primaryObstacleType())
+                .lat(input.latitude())
+                .lon(input.longitude())
+                .country(input.address().country())
+                .region(input.address().region())
+                .localityType(input.address().localityType())
+                .city(input.address().city())
+                .street(input.address().street())
+                .house(input.address().house())
+                .placeName(input.address().placeName())
+                .reviewsCount(0)
+                .severityEst(null)
+                .lastReviewedAt(null)
+                .build();
         features.save(created);
         return created;
     }

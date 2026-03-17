@@ -48,16 +48,17 @@ public class AdminBootstrap implements ApplicationRunner { // инициализ
 
         Instant now = Instant.now();
 
-        UserEntity user = new UserEntity();
-        user.setFirstName(null);
-        user.setLastName(null);
-        user.setPhoneHash(phoneHash);
-        user.setRole(Role.MODERATOR_ADMIN.name());
-        user.setPassHash(passwordEncoder.encode(adminPass));
-        user.setPhotoUrl(null);
-        user.setActive(true);
-        user.setCreatedAt(now);
-        user.setLastActiveAt(now);
+        UserEntity user = UserEntity.builder()
+                .firstName(null)
+                .lastName(null)
+                .phoneHash(phoneHash)
+                .role(Role.MODERATOR_ADMIN.name())
+                .passHash(passwordEncoder.encode(adminPass))
+                .photoUrl(null)
+                .active(true)
+                .createdAt(now)
+                .lastActiveAt(now)
+                .build();
 
         users.save(user);
     }

@@ -1,6 +1,7 @@
 package GoodRoad.reviews.repository;
 
 import jakarta.persistence.Column;
+import lombok.Builder;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -54,6 +55,38 @@ public class ObstacleReviewEntity {
 
     @Column(name = "moderator_comment", length = 1000)
     private String moderatorComment;
+
+    public ObstacleReviewEntity() {
+    }
+
+    @Builder
+    public ObstacleReviewEntity(
+            Long featureId,
+            Long authorId,
+            Short severity,
+            String text,
+            Instant createdAt,
+            String status,
+            Integer awardedPoints,
+            Long takenByModeratorId,
+            Instant takenAt,
+            Long moderatedBy,
+            Instant moderatedAt,
+            String moderatorComment
+    ) {
+        this.featureId = featureId;
+        this.authorId = authorId;
+        this.severity = severity;
+        this.text = text;
+        this.createdAt = createdAt;
+        this.status = status;
+        this.awardedPoints = awardedPoints;
+        this.takenByModeratorId = takenByModeratorId;
+        this.takenAt = takenAt;
+        this.moderatedBy = moderatedBy;
+        this.moderatedAt = moderatedAt;
+        this.moderatorComment = moderatorComment;
+    }
 
     @PrePersist
     private void prePersist() {

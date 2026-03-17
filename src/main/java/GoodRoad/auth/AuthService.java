@@ -62,15 +62,16 @@ public class AuthService {
 
         Instant now = Instant.now();
 
-        UserEntity user = new UserEntity();
-        user.setFirstName(req.firstName());
-        user.setLastName(req.lastName());
-        user.setPhoneHash(phoneHash);
-        user.setRole("USER");
-        user.setPassHash(passwordEncoder.encode(req.password()));
-        user.setActive(true);
-        user.setCreatedAt(now);
-        user.setLastActiveAt(now);
+        UserEntity user = UserEntity.builder()
+                .firstName(req.firstName())
+                .lastName(req.lastName())
+                .phoneHash(phoneHash)
+                .role("USER")
+                .passHash(passwordEncoder.encode(req.password()))
+                .active(true)
+                .createdAt(now)
+                .lastActiveAt(now)
+                .build();
 
         users.save(user);
         return toResp(user);

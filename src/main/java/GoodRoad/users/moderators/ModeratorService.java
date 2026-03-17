@@ -43,13 +43,14 @@ public class ModeratorService {
             throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_EXISTS", "Phone number already used");
         }
 
-        UserEntity user = new UserEntity();
-        user.setFirstName(firstName);
-        user.setLastName(lastName);
-        user.setPhoneHash(phoneHash);
-        user.setRole(Role.MODERATOR.name());
-        user.setPassHash(passwordEncoder.encode(password));
-        user.setActive(true);
+        UserEntity user = UserEntity.builder()
+                .firstName(firstName)
+                .lastName(lastName)
+                .phoneHash(phoneHash)
+                .role(Role.MODERATOR.name())
+                .passHash(passwordEncoder.encode(password))
+                .active(true)
+                .build();
 
         return users.save(user).getId().toString();
     }

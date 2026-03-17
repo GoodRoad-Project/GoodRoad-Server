@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Builder;
 
 import java.time.Instant;
 
@@ -56,6 +57,40 @@ public class ObstacleFeatureEntity { // тут храним точку преп�
 
     @Column(name = "last_reviewed_at")
     private Instant lastReviewedAt;
+
+    public ObstacleFeatureEntity() {
+    }
+
+    @Builder
+    public ObstacleFeatureEntity(
+            String type,
+            double lat,
+            double lon,
+            String country,
+            String region,
+            String localityType,
+            String city,
+            String street,
+            String house,
+            String placeName,
+            Short severityEst,
+            int reviewsCount,
+            Instant lastReviewedAt
+    ) {
+        this.type = type;
+        this.lat = lat;
+        this.lon = lon;
+        this.country = country;
+        this.region = region;
+        this.localityType = localityType;
+        this.city = city;
+        this.street = street;
+        this.house = house;
+        this.placeName = placeName;
+        this.severityEst = severityEst;
+        this.reviewsCount = reviewsCount;
+        this.lastReviewedAt = lastReviewedAt;
+    }
 
     public Long getId() {
         return id;

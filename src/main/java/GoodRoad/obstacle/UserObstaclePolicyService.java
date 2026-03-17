@@ -81,9 +81,10 @@ public class UserObstaclePolicyService { // тут храним логику д�
         }
 
         for (PolicyItem item : normalized.values()) {
-            UserObstaclePolicyEntity entity = new UserObstaclePolicyEntity();
-            entity.setId(new UserObstaclePolicyKey(userId, item.obstacleType()));
-            entity.setMaxAllowedSeverity(item.maxAllowedSeverity());
+            UserObstaclePolicyEntity entity = UserObstaclePolicyEntity.builder()
+                    .id(new UserObstaclePolicyKey(userId, item.obstacleType()))
+                    .maxAllowedSeverity(item.maxAllowedSeverity())
+                    .build();
             policies.save(entity);
         }
 

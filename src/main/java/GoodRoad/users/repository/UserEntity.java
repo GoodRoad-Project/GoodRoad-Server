@@ -1,6 +1,7 @@
 package GoodRoad.users.repository;
 
 import jakarta.persistence.*;
+import lombok.Builder;
 
 import java.time.Instant;
 
@@ -43,6 +44,34 @@ public class UserEntity {
 
     @Column(name = "last_active_at", nullable = false)
     private Instant lastActiveAt;
+
+    public UserEntity() {
+    }
+
+    @Builder
+    public UserEntity(
+            String firstName,
+            String lastName,
+            String phoneHash,
+            String role,
+            String passHash,
+            String photoUrl,
+            boolean active,
+            Integer totalPoints,
+            Instant createdAt,
+            Instant lastActiveAt
+    ) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.phoneHash = phoneHash;
+        this.role = role;
+        this.passHash = passHash;
+        this.photoUrl = photoUrl;
+        this.active = active;
+        this.totalPoints = totalPoints;
+        this.createdAt = createdAt;
+        this.lastActiveAt = lastActiveAt;
+    }
 
     // выполняется перед первой вставкой в таблицу в случае, если reatedAt, lastActiveAt не заданы (у модераторов такое возможно, к примеру)
     @PrePersist
