@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class ModeratorService {
@@ -69,11 +68,21 @@ public class ModeratorService {
         users.save(user);
     }
 
-    @Transactional
-    public List<UserEntity> getAllModerators() {
-        return users.findAll().stream()
-                .filter(user -> Role.MODERATOR.name().equals(user.getRole()) || Role.MODERATOR_ADMIN.name().equals(user.getRole()))
-                .collect(Collectors.toList());
+    public record ModeratorView(
+            String id,
+            String role,
+            String firstName,
+            String lastName,
+            String photoUrl,
+            boolean active
+    ) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<ModeratorView> getAllModerators() {
+        return users.findByRoleIn(List.of(Role.MODERATOR.name(), Role.MODERATOR_ADMIN.name())).stream()
+                .map(this::toView)
+                .toList();
     }
 
     @Transactional
@@ -91,6 +100,17 @@ public class ModeratorService {
         }
 
         users.delete(user);
+    }
+
+    private ModeratorView toView(UserEntity user) {
+        return new ModeratorView(
+                user.getId().toString(),
+                user.getRole(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPhotoUrl(),
+                user.isActive()
+        );
     }
 
     private Long parseId(String raw) {

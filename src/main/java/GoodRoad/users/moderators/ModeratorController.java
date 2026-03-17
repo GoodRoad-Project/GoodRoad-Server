@@ -1,6 +1,5 @@
 package GoodRoad.users.moderators;
 
-import GoodRoad.users.repository.UserEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,7 +24,7 @@ public class ModeratorController {
     }
 
     @GetMapping("/all")
-    public List<UserEntity> getAllModerators() {
+    public List<ModeratorService.ModeratorView> getAllModerators() {
         return service.getAllModerators();
     }
 
