@@ -7,7 +7,7 @@ import java.io.Serializable;
 import java.util.Objects;
 
 @Embeddable
-public class ObstacleReviewObstacleKey implements Serializable { // аналогично с UserObstaclePolicyKey, ара ключей не должна дублироваться
+public class ObstacleReviewObstacleKey implements Serializable { // аналогично с UserObstaclePolicyKey, пара ключей не должна дублироваться
 
     @Column(name = "review_id", nullable = false)
     private Long reviewId;

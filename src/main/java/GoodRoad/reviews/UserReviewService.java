@@ -119,7 +119,7 @@ public class UserReviewService {
         ObstacleFeatureEntity feature = resolveOrCreateFeature(input);
 
         if (reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId()).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "DUP_REVIEW", "Review already exists");
+            throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "Review already exists");
         }
 
         ObstacleReviewEntity review = new ObstacleReviewEntity();
@@ -155,7 +155,7 @@ public class UserReviewService {
         if (!feature.getId().equals(oldFeatureId)) {
             reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId())
                     .ifPresent(other -> {
-                        throw new ApiException(HttpStatus.CONFLICT, "DUP_REVIEW", "Review already exists");
+                        throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "Review already exists");
                     });
         }
 
@@ -335,13 +335,13 @@ public class UserReviewService {
 
     private ValidatedReviewInput validate(UpsertReviewReq req) {
         if (req == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_REVIEW", "Bad review");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_INVALID", "Review request body is empty");
         }
         if (req.rating() < 1 || req.rating() > 5) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_RATING", "Bad rating");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_RATING_INVALID", "Rating must be in range from 1 to 5");
         }
         if (Double.isNaN(req.latitude()) || Double.isNaN(req.longitude())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_COORDS", "Bad coordinates");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_COORDS_INVALID", "Coordinates are invalid");
         }
 
         AddressReq address = validateAddress(req.address());
@@ -364,7 +364,7 @@ public class UserReviewService {
 
     private AddressReq validateAddress(AddressReq raw) {
         if (raw == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ADDRESS", "Bad address");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ADDRESS_INVALID", "Address is invalid");
         }
         String country = requireAddressValue(raw.country());
         String region = requireAddressValue(raw.region());
@@ -385,13 +385,13 @@ public class UserReviewService {
         if (rawItems != null) {
             for (ObstacleSeverityItem rawItem : rawItems) {
                 if (rawItem == null) {
-                    throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE", "Bad obstacle");
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_EMPTY", "Obstacle is empty");
                 }
 
                 String type = ObstacleType.normalize(rawItem.obstacleType());
                 short severity = rawItem.severity();
                 if (severity < 0 || severity > 3) {
-                    throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE_SEVERITY", "Bad obstacle severity");
+                    throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_SEVERITY_INVALID", "Obstacle severity is invalid");
                 }
 
                 normalized.put(type, severity);
@@ -409,7 +409,7 @@ public class UserReviewService {
         }
 
         if (!hasPositive) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "At least one obstacle must have positive severity");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_LIST_EMPTY", "At least one obstacle must have positive severity");
         }
 
         return out;
@@ -441,7 +441,7 @@ public class UserReviewService {
         }
 
         if (bestType == null || bestSeverity == 0) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "At least one obstacle must have positive severity");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_LIST_EMPTY", "At least one obstacle must have positive severity");
         }
 
         return bestType;
@@ -449,13 +449,13 @@ public class UserReviewService {
 
     private UserEntity findCurrent(String phoneFromAuth) {
         return users.findByPhoneHash(currentPhoneHash(phoneFromAuth))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
     }
 
     private String currentPhoneHash(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
         }
         return Crypto.sha256Hex(phoneNorm);
     }
@@ -463,7 +463,7 @@ public class UserReviewService {
     private ObstacleReviewEntity findMineReview(UserEntity user, String reviewId) {
         Long id = parseId(reviewId);
         return reviews.findByIdAndAuthorId(id, user.getId())
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_REVIEW", "No review"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "REVIEW_ID_NOT_FOUND", "Review with given id not found"));
     }
 
     private int normalizePoints(Integer value) {
@@ -481,14 +481,14 @@ public class UserReviewService {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
         }
     }
 
     private String requireAddressValue(String value) {
         String normalized = blankToNull(value);
         if (normalized == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ADDRESS", "Bad value");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ADDRESS_INVALID", "Address value is invalid");
         }
         return normalized;
     }

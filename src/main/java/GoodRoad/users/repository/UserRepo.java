@@ -14,10 +14,10 @@ public interface UserRepo extends JpaRepository<UserEntity, Long> {
 
     @Modifying
     @Query("""
-        delete from UserEntity u
-        where u.role <> 'MODERATOR_ADMIN'
-          and u.active = false
-          and u.lastActiveAt < :cutoff
+        delete from UserEntity user
+        where user.role <> 'MODERATOR_ADMIN'
+          and user.active = false
+          and user.lastActiveAt < :cutoff
        """)
     int deleteInactiveBefore(@Param("cutoff") Instant cutoff);
 }

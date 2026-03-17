@@ -48,7 +48,7 @@ public final class ApiErrors {
         @ExceptionHandler(Exception.class)
         public ResponseEntity<ApiError> onAny() {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(ApiError.of("INTERNAL", "Internal error"));
+                    .body(ApiError.of("SERVER_INTERNAL_ERROR", "Server internal error"));
         }
     }
 }

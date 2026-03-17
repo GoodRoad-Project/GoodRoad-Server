@@ -52,28 +52,28 @@ public class AuthService {
     public AuthResp register(RegisterReq req) {
         String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_PHONE_INVALID", "Phone number is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         if (users.findByPhoneHash(phoneHash).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_EXISTS", "Phone number already exists");
+            throw new ApiException(HttpStatus.CONFLICT, "USER_PHONE_ALREADY_EXISTS", "Phone number already exists");
         }
 
         Instant now = Instant.now();
 
-        UserEntity u = new UserEntity();
-        u.setFirstName(req.firstName());
-        u.setLastName(req.lastName());
-        u.setPhoneHash(phoneHash);
-        u.setRole("USER");
-        u.setPassHash(passwordEncoder.encode(req.password()));
-        u.setActive(true);
-        u.setCreatedAt(now);
-        u.setLastActiveAt(now);
+        UserEntity user = new UserEntity();
+        user.setFirstName(req.firstName());
+        user.setLastName(req.lastName());
+        user.setPhoneHash(phoneHash);
+        user.setRole("USER");
+        user.setPassHash(passwordEncoder.encode(req.password()));
+        user.setActive(true);
+        user.setCreatedAt(now);
+        user.setLastActiveAt(now);
 
-        users.save(u);
-        return toResp(u);
+        users.save(user);
+        return toResp(user);
     }
 
     @Transactional
@@ -82,13 +82,13 @@ public class AuthService {
         String phoneHash = Crypto.sha256Hex(phoneNorm);
 
         UserEntity user = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Invalid phone"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS_PHONE", "Phone number is invalid"));
 
         if (!user.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "Account inactive");
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is inactive");
         }
         if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Invalid password");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Password is invalid");
         }
 
         user.setLastActiveAt(Instant.now());
@@ -107,26 +107,26 @@ public class AuthService {
     public void changePass(String phoneFromAuth, String oldPassword, String newPassword) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
-        UserEntity u = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+        UserEntity user = users.findByPhoneHash(phoneHash)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));
 
-        if (!u.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "INACTIVE", "Account inactive");
+        if (!user.isActive()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is inactive");
         }
-        if (!passwordEncoder.matches(oldPassword, u.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_OLD_PASS", "Bad old password");
+        if (!passwordEncoder.matches(oldPassword, user.getPassHash())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_OLD_PASS_INVALID", "Old password is invalid");
         }
 
-        u.setPassHash(passwordEncoder.encode(newPassword));
-        u.setLastActiveAt(Instant.now());
-        users.save(u);
+        user.setPassHash(passwordEncoder.encode(newPassword));
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
     }
 
-    private AuthResp toResp(UserEntity u) {
-        return new AuthResp(new UserView(u.getId().toString(), u.getRole()));
+    private AuthResp toResp(UserEntity user) {
+        return new AuthResp(new UserView(user.getId().toString(), user.getRole()));
     }
 }

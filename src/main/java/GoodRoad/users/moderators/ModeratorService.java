@@ -35,68 +35,68 @@ public class ModeratorService {
     public String create(String firstName, String lastName, String phone, String password) {
         String phoneNorm = Crypto.normPhone(phone);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PHONE", "Bad phone");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         if (users.findByPhoneHash(phoneHash).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "PHONE_USED", "Phone already used");
+            throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_EXISTS", "Phone number already used");
         }
 
-        UserEntity u = new UserEntity();
-        u.setFirstName(firstName);
-        u.setLastName(lastName);
-        u.setPhoneHash(phoneHash);
-        u.setRole(Role.MODERATOR.name());
-        u.setPassHash(passwordEncoder.encode(password));
-        u.setActive(true);
+        UserEntity user = new UserEntity();
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setPhoneHash(phoneHash);
+        user.setRole(Role.MODERATOR.name());
+        user.setPassHash(passwordEncoder.encode(password));
+        user.setActive(true);
 
-        return users.save(u).getId().toString();
+        return users.save(user).getId().toString();
     }
 
     @Transactional
     public void disable(String id) {
         Long userId = parseId(id);
-        UserEntity u = users.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
+        UserEntity user = users.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
 
-        if (Role.MODERATOR_ADMIN.name().equals(u.getRole())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "CANT_DISABLE_ADMIN", "Cant disable admin moderator");
+        if (Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_ADMIN_CANNOT_BE_DISABLED", "Cant disable admin moderator");
         }
 
-        u.setActive(false);
-        users.save(u);
+        user.setActive(false);
+        users.save(user);
     }
 
     @Transactional
     public List<UserEntity> getAllModerators() {
         return users.findAll().stream()
-                .filter(u -> Role.MODERATOR.name().equals(u.getRole()) || Role.MODERATOR_ADMIN.name().equals(u.getRole()))
+                .filter(user -> Role.MODERATOR.name().equals(user.getRole()) || Role.MODERATOR_ADMIN.name().equals(user.getRole()))
                 .collect(Collectors.toList());
     }
 
     @Transactional
     public void deleteModerator(String id) {
         Long userId = parseId(id);
-        UserEntity u = users.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
+        UserEntity user = users.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
 
-        if (Role.MODERATOR_ADMIN.name().equals(u.getRole())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "CANT_DELETE_ADMIN", "Cant delete admin moderator");
+        if (Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ADMIN_CANNOT_BE_DELETED", "Cant delete admin moderator");
         }
 
-        if (!Role.MODERATOR.name().equals(u.getRole())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "NOT_MODERATOR", "User is not a moderator");
+        if (!Role.MODERATOR.name().equals(user.getRole())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_NOT_MODERATOR", "User is not a moderator");
         }
 
-        users.delete(u);
+        users.delete(user);
     }
 
     private Long parseId(String raw) {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
         }
     }
 

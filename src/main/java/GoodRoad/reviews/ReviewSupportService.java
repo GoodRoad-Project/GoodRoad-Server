@@ -94,24 +94,24 @@ public class ReviewSupportService {
     }
 
     public void recomputeFeatureAggregate(Long featureId) {
-        ObstacleFeatureEntity f = features.findById(featureId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature"));
+        ObstacleFeatureEntity obstacleFeature = features.findById(featureId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "FEATURE_NOT_FOUND", "Feature with given id not found"));
 
         long cnt = reviews.countByFeatureIdAndStatus(featureId, STATUS_APPROVED);
         Double avg = reviews.avgSeverity(featureId, STATUS_APPROVED);
         Instant last = reviews.lastAt(featureId, STATUS_APPROVED);
 
-        f.setReviewsCount((int) cnt);
-        f.setLastReviewedAt(last);
+        obstacleFeature.setReviewsCount((int) cnt);
+        obstacleFeature.setLastReviewedAt(last);
 
         if (avg == null || cnt == 0) {
-            f.setSeverityEst(null);
+            obstacleFeature.setSeverityEst(null);
         } else {
             short est = (short) Math.max(1, Math.min(5, Math.round(avg.floatValue())));
-            f.setSeverityEst(est);
+            obstacleFeature.setSeverityEst(est);
         }
 
-        features.save(f);
+        features.save(obstacleFeature);
     }
 
     private int obstacleOrder(String obstacleType) {

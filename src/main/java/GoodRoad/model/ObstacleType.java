@@ -19,7 +19,7 @@ public enum ObstacleType {
 
     public static String normalize(String raw) {
         if (raw == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE_TYPE", "Bad obstacle type");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_TYPE_INVALID", "Obstacle type is invalid");
         }
 
         String s = raw.trim().toUpperCase(Locale.ROOT);
@@ -31,13 +31,13 @@ public enum ObstacleType {
             case "POTHOLES" -> POTHOLES.name();
             case "SAND" -> SAND.name();
             case "GRAVEL" -> GRAVEL.name();
-            default -> throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_OBSTACLE_TYPE", "Bad obstacle type");
+            default -> throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_TYPE_INVALID", "Obstacle type is invalid");
         };
     }
 
     public static List<String> normalizeMany(List<String> rawValues) {
         if (rawValues == null || rawValues.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_OBSTACLES", "Obstacle list is empty");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_LIST_EMPTY", "Obstacle list is empty");
         }
 
         Set<String> out = new LinkedHashSet<>();

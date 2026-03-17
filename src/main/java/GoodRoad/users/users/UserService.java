@@ -23,12 +23,12 @@ public class UserService {
         System.out.println("AUTH USERNAME = " + currentUsername);
 
         UserEntity user = users.findByPhoneHash(Crypto.sha256Hex(Crypto.normPhone(currentUsername)))
-                .orElseThrow(() -> new ApiErrors.ApiException(HttpStatus.NOT_FOUND, "NO_USER", "User not found"));
+                .orElseThrow(() -> new ApiErrors.ApiException(HttpStatus.NOT_FOUND, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));
 
         if (!Role.USER.name().equals(user.getRole())) {
             throw new ApiErrors.ApiException(
                     HttpStatus.FORBIDDEN,
-                    "CANT_DELETE",
+                    "USER_CANT_DELETE",
                     "Only regular users can delete their account"
             );
         }

@@ -48,17 +48,17 @@ public class SecurityConfig {
             String phoneNorm = Crypto.normPhone(username);
             String phoneHash = Crypto.sha256Hex(phoneNorm);
 
-            UserEntity u = users.findByPhoneHash(phoneHash)
+            UserEntity user = users.findByPhoneHash(phoneHash)
                     .orElseThrow(() -> new UsernameNotFoundException("No user"));
 
-            if (!u.isActive()) {
+            if (!user.isActive()) {
                 throw new UsernameNotFoundException("Inactive user");
             }
 
             return org.springframework.security.core.userdetails.User
                     .withUsername(phoneNorm)
-                    .password(u.getPassHash())
-                    .authorities("ROLE_" + u.getRole())
+                    .password(user.getPassHash())
+                    .authorities("ROLE_" + user.getRole())
                     .build();
         };
     }

@@ -49,14 +49,14 @@ public class UserSettingsService {
 
     @Transactional(readOnly = true)
     public SettingsView getCurrent(String phoneFromAuth) {
-        UserEntity u = findCurrent(phoneFromAuth);
-        return toView(u);
+        UserEntity user = findCurrent(phoneFromAuth);
+        return toView(user);
     }
 
     @Transactional
-    public SettingsView updateCurrent(String phoneFromAuth, UpdateSettingsReq req) {
+    public SettingsView updateCurrentUserSettings(String phoneFromAuth, UpdateSettingsReq req) {
         if (req == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_UPDATE", "Nothing to update");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
         String firstName = blankToNull(req.firstName());
@@ -65,39 +65,39 @@ public class UserSettingsService {
         String phone = blankToNull(req.phone());
 
         if (firstName == null && lastName == null && photoUrl == null && phone == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_UPDATE", "Nothing to update");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
-        UserEntity u = findCurrent(phoneFromAuth);
+        UserEntity user= findCurrent(phoneFromAuth);
 
         if (req.firstName() != null) {
-            u.setFirstName(firstName);
+            user.setFirstName(firstName);
         }
         if (req.lastName() != null) {
-            u.setLastName(lastName);
+            user.setLastName(lastName);
         }
         if (req.photoUrl() != null) {
-            u.setPhotoUrl(photoUrl);
+            user.setPhotoUrl(photoUrl);
         }
         if (req.phone() != null) {
             String newPhoneNorm = Crypto.normPhone(req.phone());
             if (newPhoneNorm.isEmpty()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PHONE", "Bad phone");
+                throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
             }
 
             String newPhoneHash = Crypto.sha256Hex(newPhoneNorm);
             users.findByPhoneHash(newPhoneHash)
-                    .filter(other -> !other.getId().equals(u.getId()))
+                    .filter(other -> !other.getId().equals(user.getId()))
                     .ifPresent(other -> {
-                        throw new ApiException(HttpStatus.CONFLICT, "PHONE_USED", "Phone already used");
+                        throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_USED", "Phone number already used");
                     });
 
-            u.setPhoneHash(newPhoneHash);
+            user.setPhoneHash(newPhoneHash);
         }
 
-        u.setLastActiveAt(Instant.now());
-        users.save(u);
-        return toView(u);
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
+        return toView(user);
     }
 
     @Transactional
@@ -108,37 +108,37 @@ public class UserSettingsService {
     @Transactional
     public void deleteCurrent(String phoneFromAuth, DeleteAccountReq req) {
         if (req == null || req.password() == null || req.password().isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_PASSWORD", "Bad password");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_INVALID", "Password is invalid");
         }
 
-        UserEntity u = findCurrent(phoneFromAuth);
-        if (!passwordEncoder.matches(req.password(), u.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "BAD_CREDS", "Bad credentials");
+        UserEntity user= findCurrent(phoneFromAuth);
+        if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENTIALS_INVALID", "Credentials are invalid");
         }
 
-        users.delete(u);
+        users.delete(user);
     }
 
-    private SettingsView toView(UserEntity u) {
+    private SettingsView toView(UserEntity user) {
         return new SettingsView(
-                u.getId().toString(),
-                u.getRole(),
-                u.getFirstName(),
-                u.getLastName(),
-                u.getPhotoUrl(),
-                u.isActive()
+                user.getId().toString(),
+                user.getRole(),
+                user.getFirstName(),
+                user.getLastName(),
+                user.getPhotoUrl(),
+                user.isActive()
         );
     }
 
     private UserEntity findCurrent(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         return users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
     }
 
     private static String blankToNull(String value) {

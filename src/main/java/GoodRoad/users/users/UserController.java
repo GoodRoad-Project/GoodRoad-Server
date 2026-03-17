@@ -15,6 +15,4 @@ public class UserController {
     public void deleteCurrentUser() {
         service.deleteCurrentUser();
     }
-
-
 }

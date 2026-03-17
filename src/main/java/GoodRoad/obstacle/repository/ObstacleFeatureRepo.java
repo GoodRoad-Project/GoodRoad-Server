@@ -9,15 +9,15 @@ import java.util.Optional;
 public interface ObstacleFeatureRepo extends JpaRepository<ObstacleFeatureEntity, Long> {
 
     @Query("""
-            select f
-            from ObstacleFeatureEntity f
-            where f.lat between :latMin and :latMax
-              and f.lon between :lonMin and :lonMax
+            select obstacleFeature
+            from ObstacleFeatureEntity obstacleFeature
+            where obstacleFeature.lat between :latMin and :latMax
+              and obstacleFeature.lon between :lonMin and :lonMax
               and exists (
                   select 1
-                  from ObstacleReviewEntity r
-                  where r.featureId = f.id
-                    and r.status = :status
+                  from ObstacleReviewEntity obstacleReview
+                  where obstacleReview.featureId = obstacleFeature.id
+                    and obstacleReview.status = :status
               )
             """)
     List<ObstacleFeatureEntity> findByBboxWithReviewStatus(
@@ -27,16 +27,16 @@ public interface ObstacleFeatureRepo extends JpaRepository<ObstacleFeatureEntity
     );
 
     @Query("""
-            select f
-            from ObstacleFeatureEntity f
-            where f.type = :type
-              and f.country = :country
-              and f.region = :region
-              and f.localityType = :localityType
-              and f.city = :city
-              and f.street = :street
-              and f.house = :house
-              and ((:placeName is null and f.placeName is null) or f.placeName = :placeName)
+            select obstacleFeature
+            from ObstacleFeatureEntity obstacleFeature
+            where obstacleFeature.type = :type
+              and obstacleFeature.country = :country
+              and obstacleFeature.region = :region
+              and obstacleFeature.localityType = :localityType
+              and obstacleFeature.city = :city
+              and obstacleFeature.street = :street
+              and obstacleFeature.house = :house
+              and ((:placeName is null and obstacleFeature.placeName is null) or obstacleFeature.placeName = :placeName)
             """)
     Optional<ObstacleFeatureEntity> findByAddressAndType(
             String type,

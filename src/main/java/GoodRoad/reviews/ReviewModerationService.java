@@ -119,7 +119,7 @@ public class ReviewModerationService {
 
         Long takenBy = review.getTakenByModeratorId();
         if (takenBy != null && !takenBy.equals(moderator.getId())) {
-            throw new ApiException(HttpStatus.CONFLICT, "ALREADY_TAKEN", "Review already taken by another moderator");
+            throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_TAKEN_BY_MODERATOR", "Review already taken by another moderator");
         }
 
         if (takenBy == null) {
@@ -143,7 +143,7 @@ public class ReviewModerationService {
 
         if (delta > 0 && review.getAuthorId() != null) {
             UserEntity user = users.findById(review.getAuthorId())
-                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_USER", "No user"));
+                    .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User with given id not found"));
             user.setTotalPoints(safeAddPoints(user.getTotalPoints(), delta));
             users.save(user);
         }
@@ -167,7 +167,7 @@ public class ReviewModerationService {
 
         String comment = blankToNull(reason);
         if (comment == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "EMPTY_REASON", "Reject reason is required");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_REASON_EMPTY", "Reject reason is required");
         }
 
         review.setStatus(STATUS_REJECTED);
@@ -190,7 +190,7 @@ public class ReviewModerationService {
         }
 
         if (!review.getTakenByModeratorId().equals(moderator.getId())) {
-            throw new ApiException(HttpStatus.CONFLICT, "NOT_YOURS", "Review is taken by another moderator");
+            throw new ApiException(HttpStatus.CONFLICT, "REVIEW_NOT_TAKEN_BY_YOU", "Review is taken by another moderator");
         }
 
         review.setTakenByModeratorId(null);
@@ -267,10 +267,10 @@ public class ReviewModerationService {
         Long id = parseId(reviewId);
 
         ObstacleReviewEntity review = reviews.findByIdForUpdate(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_REVIEW", "No review"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "REVIEW_ID_NOT_FOUND", "Review with given id not found"));
 
         if (!STATUS_PENDING.equals(review.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "NOT_PENDING", "Review is not pending");
+            throw new ApiException(HttpStatus.CONFLICT, "RENIEW_NOT_PENDING", "Review is not pending");
         }
 
         return review;
@@ -280,11 +280,11 @@ public class ReviewModerationService {
         ObstacleReviewEntity review = findPendingForUpdate(reviewId);
 
         if (review.getTakenByModeratorId() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "NOT_TAKEN", "Review is not taken in work");
+            throw new ApiException(HttpStatus.CONFLICT, "REVIEW_NOT_TAKEN_BY_MODERATOR", "Review is not taken in work by moderator");
         }
 
         if (!review.getTakenByModeratorId().equals(moderatorId)) {
-            throw new ApiException(HttpStatus.CONFLICT, "NOT_YOURS", "Review is taken by another moderator");
+            throw new ApiException(HttpStatus.CONFLICT, "REVIEW_NOT_TAKEN_BY_YOU", "Review is taken by another moderator");
         }
 
         return review;
@@ -292,11 +292,11 @@ public class ReviewModerationService {
 
     private UserEntity findCurrentModerator(String phoneFromAuth) {
         UserEntity user = users.findByPhoneHash(currentPhoneHash(phoneFromAuth))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));
 
         String role = user.getRole();
         if (!Role.MODERATOR.name().equals(role) && !Role.MODERATOR_ADMIN.name().equals(role)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "FORBIDDEN", "Forbidden");
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_ROLE_FORBIDDEN", "Access denied: moderator role required");
         }
 
         return user;
@@ -320,7 +320,7 @@ public class ReviewModerationService {
     private String currentPhoneHash(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found");
         }
         return Crypto.sha256Hex(phoneNorm);
     }
@@ -347,7 +347,7 @@ public class ReviewModerationService {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Given id is invalid");
         }
     }
 

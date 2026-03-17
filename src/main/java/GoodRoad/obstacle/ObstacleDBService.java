@@ -122,10 +122,10 @@ public class ObstacleDBService {
     public ObstacleCardResp getCard(String featureId) {
         Long id = parseId(featureId);
         ObstacleFeatureEntity feature = features.findById(id)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature"));
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "OBSTACLE_FEATURE_NOT_FOUND", "Obstacle feature not found"));
 
         if (reviews.countByFeatureIdAndStatus(id, ReviewStatus.APPROVED.name()) == 0) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "NO_FEATURE", "No feature");
+            throw new ApiException(HttpStatus.NOT_FOUND, "OBSTACLE_FEATURE_NOT_FOUND", "Obstacle feature not found");
         }
 
         List<ObstacleReviewEntity> approved = reviews.findByFeatureIdAndStatusOrderByCreatedAtDesc(
@@ -199,13 +199,13 @@ public class ObstacleDBService {
 
     private void validateBBox(double minLat, double maxLat, double minLon, double maxLon) {
         if (Double.isNaN(minLat) || Double.isNaN(maxLat) || Double.isNaN(minLon) || Double.isNaN(maxLon)) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_BBOX", "Bad bbox");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BBOX_INVALID", "Bbox is invalid");
         }
         if (minLat < -90 || maxLat > 90 || minLon < -180 || maxLon > 180) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_BBOX", "Bad bbox");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BBOX_INVALID", "Bbox is invalid");
         }
         if (minLat > maxLat || minLon > maxLon) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_BBOX", "Bad bbox");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "BBOX_INVALID", "Bbox is invalid");
         }
     }
 
@@ -213,7 +213,7 @@ public class ObstacleDBService {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_ID", "Bad id");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
         }
     }
 }

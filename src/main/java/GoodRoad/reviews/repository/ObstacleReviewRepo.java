@@ -15,15 +15,15 @@ public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, 
     Page<ObstacleReviewEntity> findByStatus(String status, Pageable pageable);
 
     @Query("""
-            select r from ObstacleReviewEntity r
-            where r.status = :status
-              and (r.takenByModeratorId is null or r.takenByModeratorId = :moderatorId)
-            order by r.createdAt asc
+            select obstacleReview from ObstacleReviewEntity obstacleReview
+            where obstacleReview.status = :status
+              and (obstacleReview.takenByModeratorId is null or obstacleReview.takenByModeratorId = :moderatorId)
+            order by obstacleReview.createdAt asc
             """)
     Page<ObstacleReviewEntity> findQueueForModerator(String status, Long moderatorId, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select r from ObstacleReviewEntity r where r.id = :id")
+    @Query("select obstacleReview from ObstacleReviewEntity obstacleReview where obstacleReview.id = :id")
     Optional<ObstacleReviewEntity> findByIdForUpdate(Long id);
 
     Optional<ObstacleReviewEntity> findByFeatureIdAndAuthorId(Long featureId, Long authorId);
@@ -38,9 +38,9 @@ public interface ObstacleReviewRepo extends JpaRepository<ObstacleReviewEntity, 
 
     long countByAuthorIdAndStatus(Long authorId, String status);
 
-    @Query("select avg(r.severity) from ObstacleReviewEntity r where r.featureId = :featureId and r.status = :status")
+    @Query("select avg(obstacleReview.severity) from ObstacleReviewEntity obstacleReview where obstacleReview.featureId = :featureId and obstacleReview.status = :status")
     Double avgSeverity(Long featureId, String status);
 
-    @Query("select max(r.createdAt) from ObstacleReviewEntity r where r.featureId = :featureId and r.status = :status")
+    @Query("select max(obstacleReview.createdAt) from ObstacleReviewEntity obstacleReview where obstacleReview.featureId = :featureId and obstacleReview.status = :status")
     Instant lastAt(Long featureId, String status);
 }

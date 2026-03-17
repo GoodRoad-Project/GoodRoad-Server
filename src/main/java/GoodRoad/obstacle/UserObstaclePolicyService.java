@@ -58,7 +58,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
     @Transactional
     public List<PolicyItem> replaceUserObstaclePolicies(String phoneFromAuth, ReplacePolicyReq req) {
         if (req == null || req.items() == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_POLICY", "Bad policy");
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_OBSTACLE_POLICY_INVALID", "User obstacle policy is invalid");
         }
 
         UserEntity user = findCurrentUser(phoneFromAuth);
@@ -74,7 +74,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
                 continue;
             }
             if (severity == null || severity < 1 || severity > 3) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "BAD_POLICY_SEVERITY", "Bad policy severity");
+                throw new ApiException(HttpStatus.BAD_REQUEST, "OBSTACLE_SEVERITY_INVALID", "Obstacle severity is invalid");
             }
 
             normalized.put(type, new PolicyItem(type, true, severity));
@@ -95,10 +95,10 @@ public class UserObstaclePolicyService { // тут храним логику д�
     private UserEntity findCurrentUser(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user");
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found");
         }
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         return users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "NO_USER", "No user"));
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));
     }
 }
