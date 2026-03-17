@@ -27,11 +27,4 @@ public class ModeratorController {
     public List<ModeratorService.ModeratorView> getAllModerators() {
         return service.getAllModerators();
     }
-
-    @DeleteMapping("/{id}")
-    public void deleteModerator(@PathVariable String id) {
-        service.deleteModerator(id);
-    }
-
-
 }

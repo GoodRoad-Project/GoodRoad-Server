@@ -85,23 +85,6 @@ public class ModeratorService {
                 .toList();
     }
 
-    @Transactional
-    public void deleteModerator(String id) {
-        Long userId = parseId(id);
-        UserEntity user = users.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
-
-        if (Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "ADMIN_CANNOT_BE_DELETED", "Cant delete admin moderator");
-        }
-
-        if (!Role.MODERATOR.name().equals(user.getRole())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_NOT_MODERATOR", "User is not a moderator");
-        }
-
-        users.delete(user);
-    }
-
     private ModeratorView toView(UserEntity user) {
         return new ModeratorView(
                 user.getId().toString(),
