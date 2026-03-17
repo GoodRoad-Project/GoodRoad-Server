@@ -312,9 +312,6 @@ public class UserReviewService {
         ).orElse(null);
 
         if (feature != null) {
-            feature.setLat(input.latitude());
-            feature.setLon(input.longitude());
-            features.save(feature);
             return feature;
         }
 
