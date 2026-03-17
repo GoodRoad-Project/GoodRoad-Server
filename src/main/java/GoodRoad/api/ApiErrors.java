@@ -4,9 +4,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
 
+@Slf4j
 public final class ApiErrors {
 
     private ApiErrors() {
@@ -41,12 +43,14 @@ public final class ApiErrors {
     public static class GlobalHandler {
 
         @ExceptionHandler(ApiException.class)
-        public ResponseEntity<ApiError> onApi(ApiException e) {
+        public ResponseEntity<ApiError> handleApiException(ApiException e) {
+            log.error("API exception: code={}, msg={}", e.code(), e.getMessage(), e);
             return ResponseEntity.status(e.status()).body(ApiError.of(e.code(), e.getMessage()));
         }
 
         @ExceptionHandler(Exception.class)
-        public ResponseEntity<ApiError> onAny() {
+        public ResponseEntity<ApiError> handleServerError(Exception e) {
+            log.error("Unexpected exception", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiError.of("SERVER_INTERNAL_ERROR", "Server internal error"));
         }

@@ -8,7 +8,9 @@ import GoodRoad.model.Role;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class UserService {
 
@@ -20,7 +22,7 @@ public class UserService {
 
     public void deleteCurrentUser() {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName(); //вернет логин
-        System.out.println("AUTH USERNAME = " + currentUsername);
+        log.info("AUTH USERNAME = {}", currentUsername);
 
         UserEntity user = users.findByPhoneHash(Crypto.sha256Hex(Crypto.normPhone(currentUsername)))
                 .orElseThrow(() -> new ApiErrors.ApiException(HttpStatus.NOT_FOUND, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));

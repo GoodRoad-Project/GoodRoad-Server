@@ -1,6 +1,6 @@
 package GoodRoad.reviews.repository;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
