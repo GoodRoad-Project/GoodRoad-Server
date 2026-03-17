@@ -202,9 +202,13 @@ public class UserReviewService {
 
         String oldStatus = review.getStatus();
         Long featureId = review.getFeatureId();
+        int oldAwardedPoints = normalizePoints(review.getAwardedPoints());
         reviews.delete(review);
 
         if (STATUS_APPROVED.equals(oldStatus)) {
+            if (oldAwardedPoints > 0) {
+                user.setTotalPoints(safeSubtractPoints(user.getTotalPoints(), oldAwardedPoints));
+            }
             reviewSupport.recomputeFeatureAggregate(featureId);
         }
 
