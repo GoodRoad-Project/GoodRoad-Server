@@ -1,0 +1,16 @@
+FROM gradle:8.3-jdk17 AS build
+WORKDIR /app
+
+# Копируем файлы для сборки зависимостей
+COPY build.gradle settings.gradle ./
+COPY src ./src
+
+# Сборка без тестов
+RUN gradle bootJar -x test --no-daemon
+
+# Финальный образ
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY --from=build /app/build/libs/backend.jar ./backend.jar
+
+CMD ["java", "-jar", "backend.jar"]
