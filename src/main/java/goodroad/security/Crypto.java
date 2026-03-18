@@ -6,7 +6,7 @@ import java.util.regex.Pattern;
 
 public final class Crypto {
 
-    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?\\d+$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?[78]\\d{10}$");
 
     private Crypto() {
     }
@@ -21,7 +21,11 @@ public final class Crypto {
             return "";
         }
 
-        return normalized.charAt(0) == '+' ? normalized.substring(1) : normalized;
+        String digits = normalized.charAt(0) == '+' ? normalized.substring(1) : normalized;
+        if (digits.charAt(0) == '8') {
+            return "7" + digits.substring(1);
+        }
+        return digits;
     }
 
     public static String sha256Hex(String s) {
