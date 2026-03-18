@@ -4,10 +4,17 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ObstacleType;
 import goodroad.obstacle.repository.ObstacleFeatureEntity;
 import goodroad.obstacle.repository.ObstacleFeatureRepo;
-import goodroad.reviews.repository.*;
+import goodroad.reviews.repository.ObstacleReviewEntity;
+import goodroad.reviews.repository.ObstacleReviewObstacleEntity;
+import goodroad.reviews.repository.ObstacleReviewObstacleKey;
+import goodroad.reviews.repository.ObstacleReviewObstacleRepo;
+import goodroad.reviews.repository.ObstacleReviewPhotoEntity;
+import goodroad.reviews.repository.ObstacleReviewPhotoRepo;
+import goodroad.reviews.repository.ObstacleReviewRepo;
 import goodroad.security.Crypto;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.InputRules;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -371,13 +378,39 @@ public class UserReviewService {
         if (raw == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "ADDRESS_INVALID", "Address is invalid");
         }
-        String country = requireAddressValue(raw.country());
-        String region = requireAddressValue(raw.region());
-        String localityType = requireAddressValue(raw.localityType());
-        String city = requireAddressValue(raw.city());
-        String street = requireAddressValue(raw.street());
-        String house = requireAddressValue(raw.house());
+
+        String country = InputRules.requireCyrillicText(
+                raw.country(),
+                "ADDRESS_COUNTRY_INVALID",
+                "Country"
+        );
+        String region = InputRules.requireCyrillicText(
+                raw.region(),
+                "ADDRESS_REGION_INVALID",
+                "Region"
+        );
+        String localityType = InputRules.requireCyrillicText(
+                raw.localityType(),
+                "ADDRESS_LOCALITY_TYPE_INVALID",
+                "Locality type"
+        );
+        String city = InputRules.requireCyrillicText(
+                raw.city(),
+                "ADDRESS_CITY_INVALID",
+                "City"
+        );
+        String street = InputRules.requireCyrillicText(
+                raw.street(),
+                "ADDRESS_STREET_INVALID",
+                "Street"
+        );
+        String house = InputRules.requireDigits(
+                raw.house(),
+                "ADDRESS_HOUSE_INVALID",
+                "House"
+        );
         String placeName = blankToNull(raw.placeName());
+
         return new AddressReq(country, region, localityType, city, street, house, placeName);
     }
 
@@ -488,14 +521,6 @@ public class UserReviewService {
         } catch (NumberFormatException e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
         }
-    }
-
-    private String requireAddressValue(String value) {
-        String normalized = blankToNull(value);
-        if (normalized == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "ADDRESS_INVALID", "Address value is invalid");
-        }
-        return normalized;
     }
 
     private static String blankToNull(String value) {

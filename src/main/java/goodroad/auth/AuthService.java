@@ -1,9 +1,10 @@
 package goodroad.auth;
 
 import goodroad.api.ApiErrors.ApiException;
+import goodroad.security.Crypto;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
-import goodroad.security.Crypto;
+import goodroad.validation.InputRules;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -50,6 +51,18 @@ public class AuthService {
 
     @Transactional
     public AuthResp register(RegisterReq req) {
+        String firstName = InputRules.requireCyrillicText(
+                req.firstName(),
+                "USER_FIRST_NAME_INVALID",
+                "First name"
+        );
+
+        String lastName = InputRules.requireCyrillicText(
+                req.lastName(),
+                "USER_LAST_NAME_INVALID",
+                "Last name"
+        );
+
         String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_PHONE_INVALID", "Phone number is invalid");
@@ -63,8 +76,8 @@ public class AuthService {
         Instant now = Instant.now();
 
         UserEntity user = UserEntity.builder()
-                .firstName(req.firstName())
-                .lastName(req.lastName())
+                .firstName(firstName)
+                .lastName(lastName)
                 .phoneHash(phoneHash)
                 .role("USER")
                 .passHash(passwordEncoder.encode(req.password()))
@@ -80,6 +93,10 @@ public class AuthService {
     @Transactional
     public AuthResp login(LoginReq req) {
         String phoneNorm = Crypto.normPhone(req.phone());
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS_PHONE", "Phone number is invalid");
+        }
+
         String phoneHash = Crypto.sha256Hex(phoneNorm);
 
         UserEntity user = users.findByPhoneHash(phoneHash)
@@ -102,7 +119,8 @@ public class AuthService {
             String phoneFromAuth,
             String oldPassword,
             String newPassword
-    ) {}
+    ) {
+    }
 
     @Transactional
     public void changePass(String phoneFromAuth, String oldPassword, String newPassword) {

@@ -4,6 +4,7 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.auth.AuthService;
 import goodroad.model.Role;
 import goodroad.security.Crypto;
+import goodroad.validation.InputRules;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import org.springframework.http.HttpStatus;
@@ -62,21 +63,20 @@ public class UserSettingsService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
-        String firstName = blankToNull(req.firstName());
-        String lastName = blankToNull(req.lastName());
         String photoUrl = blankToNull(req.photoUrl());
-        String phone = blankToNull(req.phone());
 
-        if (firstName == null && lastName == null && photoUrl == null && phone == null) {
+        if (req.firstName() == null && req.lastName() == null && req.photoUrl() == null && req.phone() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
-        UserEntity user= findCurrent(phoneFromAuth);
+        UserEntity user = findCurrent(phoneFromAuth);
 
         if (req.firstName() != null) {
+            String firstName = InputRules.requireCyrillicText(req.firstName(), "USER_FIRST_NAME_INVALID", "First name");
             user.setFirstName(firstName);
         }
         if (req.lastName() != null) {
+            String lastName = InputRules.requireCyrillicText(req.lastName(), "USER_LAST_NAME_INVALID", "Last name");
             user.setLastName(lastName);
         }
         if (req.photoUrl() != null) {
@@ -145,7 +145,7 @@ public class UserSettingsService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_INVALID", "Password is invalid");
         }
 
-        UserEntity user= findCurrent(phoneFromAuth);
+        UserEntity user = findCurrent(phoneFromAuth);
         if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENTIALS_INVALID", "Credentials are invalid");
         }
