@@ -1,10 +1,11 @@
 package goodroad.users.moderators;
 
 import goodroad.api.ApiErrors.ApiException;
-import goodroad.users.repository.UserEntity;
-import goodroad.users.repository.UserRepo;
 import goodroad.model.Role;
 import goodroad.security.Crypto;
+import goodroad.users.repository.UserEntity;
+import goodroad.users.repository.UserRepo;
+import goodroad.validation.InputRules;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,10 +29,23 @@ public class ModeratorService {
             String lastName,
             String phone,
             String password
-    ) {}
+    ) {
+    }
 
     @Transactional
     public String create(String firstName, String lastName, String phone, String password) {
+        String normalizedFirstName = InputRules.requireCyrillicText(
+                firstName,
+                "MODERATOR_FIRST_NAME_INVALID",
+                "First name"
+        );
+
+        String normalizedLastName = InputRules.requireCyrillicText(
+                lastName,
+                "MODERATOR_LAST_NAME_INVALID",
+                "Last name"
+        );
+
         String phoneNorm = Crypto.normPhone(phone);
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
@@ -43,8 +57,8 @@ public class ModeratorService {
         }
 
         UserEntity user = UserEntity.builder()
-                .firstName(firstName)
-                .lastName(lastName)
+                .firstName(normalizedFirstName)
+                .lastName(normalizedLastName)
                 .phoneHash(phoneHash)
                 .role(Role.MODERATOR.name())
                 .passHash(passwordEncoder.encode(password))
@@ -103,5 +117,4 @@ public class ModeratorService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
         }
     }
-
 }
