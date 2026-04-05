@@ -51,7 +51,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
         return out;
     }
 
-    private List<PolicyItem> getCurrent(String phoneFromAuth) {
+    private List<PolicyItem> getCurrentUser(String phoneFromAuth) {
         return getUserObstaclePolicies(phoneFromAuth);
     }
 
@@ -90,7 +90,7 @@ public class UserObstaclePolicyService { // тут храним логику д�
 
         user.setLastActiveAt(Instant.now());
         users.save(user);
-        return getCurrent(phoneFromAuth);
+        return getCurrentUser(phoneFromAuth);
     }
 
     private UserEntity findCurrentUser(String phoneFromAuth) {
