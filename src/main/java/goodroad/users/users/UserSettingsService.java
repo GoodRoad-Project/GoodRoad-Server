@@ -27,14 +27,14 @@ public class UserSettingsService {
         this.authService = authService;
     }
 
-    public record SettingsView(
-            String id,
-            String role,
-            String firstName,
-            String lastName,
-            String photoUrl,
-            boolean active
-    ) {
+        public record SettingsView(
+                String id,
+                String role,
+                String firstName,
+                String lastName,
+                String photoUrl,
+                boolean active
+        ) {
     }
 
     public record UpdateSettingsReq(
@@ -51,7 +51,7 @@ public class UserSettingsService {
     }
 
     @Transactional(readOnly = true)
-    public SettingsView getCurrent(String phoneFromAuth) {
+    public SettingsView getCurrentUser(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         return toView(user);
     }
