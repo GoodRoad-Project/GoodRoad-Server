@@ -9,8 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
+import java.util.Objects;
 
 @Service
 public class AuthService {
@@ -34,6 +34,14 @@ public class AuthService {
     public record LoginReq(
             @NotBlank String phone,
             @NotBlank String password
+    ) {
+    }
+
+    public record RecoverPassReq(
+            @NotBlank String phone,
+            @NotBlank String firstName,
+            @NotBlank String lastName,
+            @NotBlank String newPassword
     ) {
     }
 
@@ -127,7 +135,40 @@ public class AuthService {
         users.save(user);
     }
 
+    @Transactional
+    public void recoverPass(String phone, String firstName, String lastName, String newPassword) {
+        String phoneNorm = Crypto.normPhone(phone);
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_PHONE_INVALID", "Phone number is invalid");
+        }
+
+        String phoneHash = Crypto.sha256Hex(phoneNorm);
+        UserEntity user = users.findByPhoneHash(phoneHash)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+
+        if (!user.isActive()) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is inactive");
+        }
+
+        if (!Objects.equals(blankToNull(user.getFirstName()), blankToNull(firstName)) ||
+                !Objects.equals(blankToNull(user.getLastName()), blankToNull(lastName))) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "RECOVER_DATA_INVALID", "Recovery data is invalid");
+        }
+
+        user.setPassHash(passwordEncoder.encode(newPassword));
+        user.setLastActiveAt(Instant.now());
+        users.save(user);
+    }
+
     private AuthResp toResp(UserEntity user) {
         return new AuthResp(new UserView(user.getId().toString(), user.getRole()));
+    }
+
+    private static String blankToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String s = value.trim();
+        return s.isEmpty() ? null : s;
     }
 }

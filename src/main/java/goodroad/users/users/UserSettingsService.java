@@ -6,25 +6,45 @@ import goodroad.model.Role;
 import goodroad.security.Crypto;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.*;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.*;
 import java.time.Instant;
+import java.util.Set;
+import java.util.UUID;
 
 @SuppressWarnings({"DuplicatedCode", "SpellCheckingInspection"})
 @Service
 public class UserSettingsService {
 
+    private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+
     private final UserRepo users;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
+    private final Path avatarDir;
 
-    public UserSettingsService(UserRepo users, PasswordEncoder passwordEncoder, AuthService authService) {
+    public UserSettingsService(
+            UserRepo users,
+            PasswordEncoder passwordEncoder,
+            AuthService authService,
+            @Value("${app.avatar.dir:uploads/avatars}") String avatarDir
+    ) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
+        this.avatarDir = Paths.get(avatarDir).toAbsolutePath().normalize();
     }
 
     public record SettingsView(
@@ -45,13 +65,18 @@ public class UserSettingsService {
     ) {
     }
 
+    public record AvatarUploadResp(
+            String photoUrl
+    ) {
+    }
+
     public record DeleteAccountReq(
             String password
     ) {
     }
 
     @Transactional(readOnly = true)
-    public SettingsView getCurrent(String phoneFromAuth) {
+    public SettingsView getCurrentUser(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         return toView(user);
     }
@@ -106,6 +131,63 @@ public class UserSettingsService {
     @Transactional
     public void changePassword(String phoneFromAuth, String oldPassword, String newPassword) {
         authService.changePass(phoneFromAuth, oldPassword, newPassword);
+    }
+
+    @Transactional
+    public AvatarUploadResp uploadAvatar(String phoneFromAuth, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_EMPTY", "Avatar file is empty");
+        }
+        if (file.getSize() > MAX_AVATAR_SIZE) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_TOO_LARGE", "Avatar file is too large");
+        }
+        if (!ALLOWED_AVATAR_TYPES.contains(file.getContentType())) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_TYPE_INVALID", "Avatar file type is invalid");
+        }
+
+        UserEntity user = findCurrent(phoneFromAuth);
+        String extension = resolveExtension(file.getContentType(), file.getOriginalFilename());
+        String fileName = user.getId() + "-" + UUID.randomUUID() + extension;
+
+        try {
+            Files.createDirectories(avatarDir);
+            Path target = avatarDir.resolve(fileName).normalize();
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            String photoUrl = ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/users/avatar/")
+                    .path(fileName)
+                    .toUriString();
+
+            return new AvatarUploadResp(photoUrl);
+        } catch (IOException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "AVATAR_SAVE_FAILED", "Avatar file could not be saved");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<Resource> getAvatar(String fileName) {
+        try {
+            Path file = avatarDir.resolve(fileName).normalize();
+            if (!file.startsWith(avatarDir) || !Files.exists(file) || !Files.isRegularFile(file)) {
+                throw new ApiException(HttpStatus.NOT_FOUND, "AVATAR_NOT_FOUND", "Avatar file not found");
+            }
+
+            Resource resource = new UrlResource(file.toUri());
+            String contentType = Files.probeContentType(file);
+            if (contentType == null) {
+                contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+            }
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .body(resource);
+        } catch (MalformedURLException e) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "AVATAR_NOT_FOUND", "Avatar file not found");
+        } catch (IOException e) {
+            throw new ApiException(HttpStatus.INTERNAL_SERVER_ERROR, "AVATAR_READ_FAILED", "Avatar file could not be read");
+        }
     }
 
     @Transactional
@@ -189,5 +271,20 @@ public class UserSettingsService {
         }
         String s = value.trim();
         return s.isEmpty() ? null : s;
+    }
+
+    private static String resolveExtension(String contentType, String originalFilename) {
+        if ("image/jpeg".equals(contentType)) {
+            return ".jpg";
+        }
+        if ("image/png".equals(contentType)) {
+            return ".png";
+        }
+        if ("image/webp".equals(contentType)) {
+            return ".webp";
+        }
+
+        String extension = StringUtils.getFilenameExtension(originalFilename);
+        return extension == null || extension.isBlank() ? "" : "." + extension;
     }
 }

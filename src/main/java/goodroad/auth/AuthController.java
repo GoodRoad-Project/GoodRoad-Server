@@ -24,8 +24,8 @@ public class AuthController {
         return service.login(req);
     }
 
-    @PostMapping("/change-password")
-    public void changePassword(@RequestBody AuthService.ChangePassReq req) {
-        service.changePass(req.phoneFromAuth(), req.oldPassword(), req.newPassword());
+    @PostMapping("/recover-password")
+    public void recoverPassword(@RequestBody AuthService.RecoverPassReq req) {
+        service.recoverPass(req.phone(), req.firstName(), req.lastName(), req.newPassword());
     }
 }
