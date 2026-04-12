@@ -2,21 +2,13 @@ package goodroad.obstacle;
 
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ObstacleType;
-import goodroad.users.repository.UserObstaclePolicyEntity;
-import goodroad.users.repository.UserObstaclePolicyKey;
-import goodroad.users.repository.UserObstaclePolicyRepo;
+import goodroad.users.repository.*;
 import goodroad.security.Crypto;
-import goodroad.users.repository.UserEntity;
-import goodroad.users.repository.UserRepo;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @SuppressWarnings("DuplicatedCode")
 @Service

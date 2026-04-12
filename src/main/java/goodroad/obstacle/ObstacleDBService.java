@@ -4,21 +4,12 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ReviewStatus;
 import goodroad.obstacle.repository.ObstacleFeatureEntity;
 import goodroad.obstacle.repository.ObstacleFeatureRepo;
-import goodroad.reviews.repository.ObstacleReviewEntity;
-import goodroad.reviews.repository.ObstacleReviewObstacleEntity;
-import goodroad.reviews.repository.ObstacleReviewObstacleRepo;
-import goodroad.reviews.repository.ObstacleReviewPhotoEntity;
-import goodroad.reviews.repository.ObstacleReviewPhotoRepo;
-import goodroad.reviews.repository.ObstacleReviewRepo;
+import goodroad.reviews.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class ObstacleDBService {
