@@ -82,7 +82,7 @@ public class AuthService {
                 .lastActiveAt(now)
                 .build();
 
-        UserEntity saved = users.save(user);   // ✅ ВАЖНО
+        UserEntity saved = users.save(user);
 
         return toResp(saved);
     }
