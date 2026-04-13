@@ -4,20 +4,15 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ObstacleType;
 import goodroad.obstacle.repository.ObstacleFeatureEntity;
 import goodroad.obstacle.repository.ObstacleFeatureRepo;
-import goodroad.reviews.repository.*;
 import goodroad.security.Crypto;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import goodroad.reviews.repository.*;
 
 @Service
 public class UserReviewService {

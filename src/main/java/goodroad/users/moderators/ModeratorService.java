@@ -9,7 +9,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 @Service
@@ -31,7 +30,7 @@ public class ModeratorService {
     ) {}
 
     @Transactional
-    public String create(String firstName, String lastName, String phone, String password) {
+    public String createModerator(String firstName, String lastName, String phone, String password) {
         String phoneNorm = Crypto.normPhone(phone);
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");

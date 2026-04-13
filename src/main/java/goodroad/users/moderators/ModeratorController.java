@@ -1,8 +1,7 @@
 package goodroad.users.moderators;
 
-import org.springframework.web.bind.annotation.*;
-
 import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/users/moderators")
@@ -14,8 +13,8 @@ public class ModeratorController {
     }
 
     @PostMapping("")
-    public String create(@RequestBody ModeratorService.createReq req) {
-        return service.create(req.firstName(), req.lastName(), req.phone(), req.password());
+    public String createModerator(@RequestBody ModeratorService.createReq req) {
+        return service.createModerator(req.firstName(), req.lastName(), req.phone(), req.password());
     }
 
     @PutMapping("/{id}")
