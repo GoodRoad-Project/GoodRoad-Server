@@ -33,7 +33,7 @@ public class ModeratorService {
     }
 
     @Transactional
-    public String create(String firstName, String lastName, String phone, String password) {
+    public String createModerator(String firstName, String lastName, String phone, String password) {
         String normalizedFirstName = InputRules.requireCyrillicText(
                 firstName,
                 "MODERATOR_FIRST_NAME_INVALID",
@@ -49,6 +49,10 @@ public class ModeratorService {
         String phoneNorm = Crypto.normPhone(phone);
         if (phoneNorm.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
+        }
+
+        if (password == null || password.isBlank()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_INVALID", "Password is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
