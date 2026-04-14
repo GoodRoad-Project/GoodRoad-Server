@@ -5,14 +5,15 @@ import goodroad.model.Role;
 import goodroad.security.Crypto;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.InputRules;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 @Service
@@ -42,17 +43,10 @@ public class AuthService {
     ) {
     }
 
-    public record ChangePassReq(
-            String phoneFromAuth,
-            String oldPassword,
-            String newPassword
-    ) {
-    }
-
     public record RecoverPassReq(
             @NotBlank String phone,
-            String firstName,
-            String lastName,
+            @NotBlank String firstName,
+            @NotBlank String lastName,
             @NotBlank String newPassword
     ) {
     }
@@ -70,28 +64,35 @@ public class AuthService {
 
     @Transactional
     public AuthResp register(RegisterReq req) {
-        String firstName = normalizeRequiredCyrillicName(
+        String firstName = InputRules.requireCyrillicText(
                 req.firstName(),
                 "USER_FIRST_NAME_INVALID",
-                "First name is invalid"
+                "First name"
         );
-        String lastName = normalizeRequiredCyrillicName(
+        String lastName = InputRules.requireCyrillicText(
                 req.lastName(),
                 "USER_LAST_NAME_INVALID",
-                "Last name is invalid"
+                "Last name"
         );
 
         String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_PHONE_INVALID", "Phone number is invalid");
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "USER_PHONE_INVALID",
+                    "Phone number is invalid");
         }
+
         if (req.password() == null || req.password().isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_PASSWORD_INVALID", "Password is invalid");
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "USER_PASSWORD_INVALID",
+                    "Password is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         if (users.findByPhoneHash(phoneHash).isPresent()) {
-            throw new ApiException(HttpStatus.CONFLICT, "USER_PHONE_ALREADY_EXISTS", "Phone number already exists");
+            throw new ApiException(HttpStatus.CONFLICT,
+                    "USER_PHONE_ALREADY_EXISTS",
+                    "Phone number already exists");
         }
 
         Instant now = Instant.now();
@@ -107,60 +108,99 @@ public class AuthService {
                 .lastActiveAt(now)
                 .build();
 
-        users.save(user);
-        return toResp(user);
+        UserEntity saved = users.save(user);
+
+        return toResp(saved);
     }
 
     @Transactional
     public AuthResp login(LoginReq req) {
         String phoneNorm = Crypto.normPhone(req.phone());
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS_PHONE", "Phone number is invalid");
+            throw new ApiException(HttpStatus.UNAUTHORIZED,
+                    "AUTH_INVALID_CREDENTIALS_PHONE",
+                    "Phone number is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
+
         UserEntity user = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS_PHONE", "Phone number is invalid"));
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "AUTH_INVALID_CREDENTIALS_PHONE",
+                        "Phone number is invalid"
+                ));
 
         if (!user.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is inactive");
+            throw new ApiException(HttpStatus.FORBIDDEN,
+                    "USER_INACTIVE",
+                    "User account is inactive");
         }
+
         if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_CREDENTIALS", "Password is invalid");
+            throw new ApiException(HttpStatus.UNAUTHORIZED,
+                    "AUTH_INVALID_CREDENTIALS",
+                    "Password is invalid");
         }
 
         user.setLastActiveAt(Instant.now());
-        users.save(user);
+        UserEntity saved = users.save(user);
 
-        return toResp(user);
+        return toResp(saved);
+    }
+
+    public record ChangePassReq(
+            String phoneFromAuth,
+            String oldPassword,
+            String newPassword
+    ) {
     }
 
     @Transactional
     public void changePass(String phoneFromAuth, String oldPassword, String newPassword) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found");
+            throw new ApiException(HttpStatus.UNAUTHORIZED,
+                    "USER_PHONE_NOT_FOUND",
+                    "User with given phone number not found");
         }
+
         if (oldPassword == null || oldPassword.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_OLD_PASS_INVALID", "Old password is invalid");
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "USER_OLD_PASS_INVALID",
+                    "Old password is invalid");
         }
+
         if (newPassword == null || newPassword.isBlank()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "USER_NEW_PASS_INVALID", "New password is invalid");
+            throw new ApiException(HttpStatus.BAD_REQUEST,
+                    "USER_NEW_PASS_INVALID",
+                    "New password is invalid");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
+
         UserEntity user = users.findByPhoneHash(phoneHash)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone number not found"));
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "USER_PHONE_NOT_FOUND",
+                        "User with given phone number not found"
+                ));
 
         if (!user.isActive()) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "USER_INACTIVE", "User account is inactive");
+            throw new ApiException(HttpStatus.FORBIDDEN,
+                    "USER_INACTIVE",
+                    "User account is inactive");
         }
+
         if (!passwordEncoder.matches(oldPassword, user.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_OLD_PASS_INVALID", "Old password is invalid");
+            throw new ApiException(HttpStatus.UNAUTHORIZED,
+                    "USER_OLD_PASS_INVALID",
+                    "Old password is invalid");
         }
 
         user.setPassHash(passwordEncoder.encode(newPassword));
         user.setLastActiveAt(Instant.now());
+
         users.save(user);
     }
 
@@ -188,7 +228,8 @@ public class AuthService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_RECOVERY_DATA_INVALID", "Recovery data is invalid");
         }
 
-        if (!storedFirstName.equals(normalizedFirstName) || !storedLastName.equals(normalizedLastName)) {
+        if (!Objects.equals(storedFirstName, normalizedFirstName) ||
+                !Objects.equals(storedLastName, normalizedLastName)) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_RECOVERY_DATA_INVALID", "Recovery data is invalid");
         }
 
@@ -197,32 +238,20 @@ public class AuthService {
         users.save(user);
     }
 
-    private String normalizeRequiredCyrillicName(String value, String code, String message) {
-        String normalized = trimToNull(value);
-        if (normalized == null || !CYRILLIC_NAME_PATTERN.matcher(normalized).matches()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, code, message);
-        }
-        return normalized;
+    private AuthResp toResp(UserEntity user) {
+        return new AuthResp(
+                new UserView(
+                        String.valueOf(Objects.requireNonNull(user.getId())),
+                        user.getRole()
+                )
+        );
     }
 
     private String normalizeRecoveryName(String value) {
-        String normalized = trimToNull(value);
+        String normalized = InputRules.trimToNull(value);
         if (normalized == null || !CYRILLIC_NAME_PATTERN.matcher(normalized).matches()) {
             return null;
         }
         return normalized.toLowerCase(Locale.ROOT);
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-
-        String normalized = value.trim();
-        return normalized.isEmpty() ? null : normalized;
-    }
-
-    private AuthResp toResp(UserEntity user) {
-        return new AuthResp(new UserView(user.getId().toString(), user.getRole()));
     }
 }
