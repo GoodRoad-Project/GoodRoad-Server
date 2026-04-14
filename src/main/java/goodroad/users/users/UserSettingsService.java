@@ -4,9 +4,9 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.auth.AuthService;
 import goodroad.model.Role;
 import goodroad.security.Crypto;
-import goodroad.validation.InputRules;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.InputRules;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
@@ -89,6 +89,7 @@ public class UserSettingsService {
         }
 
         String photoUrl = blankToNull(req.photoUrl());
+        String phone = blankToNull(req.phone());
 
         if (req.firstName() == null && req.lastName() == null && req.photoUrl() == null && req.phone() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
@@ -107,8 +108,8 @@ public class UserSettingsService {
         if (req.photoUrl() != null) {
             user.setPhotoUrl(photoUrl);
         }
-        if (req.phone() != null) {
-            String newPhoneNorm = Crypto.normPhone(req.phone());
+        if (phone != null) {
+            String newPhoneNorm = Crypto.normPhone(phone);
             if (newPhoneNorm.isEmpty()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
             }

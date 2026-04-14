@@ -30,6 +30,8 @@ public class SecurityConfig {
                         .requestMatchers("/auth/register").permitAll()
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers("/auth/recover-password").permitAll()
+                        .requestMatchers("/users/avatar/**").permitAll()
+                        //.requestMatchers("/users/moderators/{id}").hasAnyRole("MODERATOR", "MODERATOR_ADMIN") // TODO: возможно пересмотреть права пользователей на этот ендпоинт
                         .requestMatchers("/users/moderators/**").hasRole("MODERATOR_ADMIN")
                         .requestMatchers("/reviews/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
                         .anyRequest().authenticated()
