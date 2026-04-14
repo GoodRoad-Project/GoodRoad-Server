@@ -1,9 +1,8 @@
 package goodroad.users.repository;
 
-import jakarta.persistence.*;
 import lombok.Builder;
-
 import java.time.Instant;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "users")

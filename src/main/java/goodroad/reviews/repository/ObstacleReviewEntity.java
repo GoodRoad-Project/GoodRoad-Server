@@ -1,14 +1,7 @@
 package goodroad.reviews.repository;
 
-import jakarta.persistence.Column;
+import jakarta.persistence.*;
 import lombok.Builder;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.Table;
-
 import java.time.Instant;
 
 @Entity

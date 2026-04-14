@@ -2,12 +2,7 @@ package goodroad.model;
 
 import goodroad.api.ApiErrors.ApiException;
 import org.springframework.http.HttpStatus;
-
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 
 public enum ObstacleType {
     CURB,
