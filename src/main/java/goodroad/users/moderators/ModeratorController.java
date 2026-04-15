@@ -18,8 +18,8 @@ public class ModeratorController {
     }
 
     @PutMapping("/{id}")
-    public void disable(@PathVariable String id) {
-        service.disable(id);
+    public void disableModerator(@PathVariable String id) {
+        service.disableModerator(id);
     }
 
     @GetMapping("/all")
