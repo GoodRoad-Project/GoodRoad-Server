@@ -34,15 +34,8 @@
 ---
 
 ## Архитектура сервера
+<img width="1178" height="320" alt="server_architecture" src="https://github.com/user-attachments/assets/610e796b-8163-4c7b-a012-8e3226eee4d6" />
 
-Сервер реализован по следующей схеме:
-
-**Controller → Service → Repository → Database**
-
-- **Controller Layer** принимает запросы от Android-клиента и возвращает HTTP/JSON-ответ;
-- **Service Layer** содержит основную бизнес-логику;
-- **Repository Layer** работает с PostgreSQL через JPA;
-- **Database Layer** хранит пользователей, препятствия, пользовательские настройки, отзывы, фотографии и результаты модерации.
 
 ### Основные backend-модули
 
