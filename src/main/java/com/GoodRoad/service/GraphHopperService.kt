@@ -41,7 +41,13 @@ class GraphHopperService(
                 "custom_model" to (customModel ?: emptyMap<String, Any>())
             )
 
-            webClient.post().uri("/route").bodyValue(requestBody)
+            webClient.post()
+                .uri { uriBuilder ->
+                uriBuilder.path("/route")
+                    .queryParam("key", apiKey)
+                    .build()
+                }
+                .bodyValue(requestBody)
                 .header("Content-Type", "application/json")
                 .retrieve()
                 .awaitBody<GraphHopperResponse>()
