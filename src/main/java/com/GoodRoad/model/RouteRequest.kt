@@ -3,8 +3,8 @@ package com.GoodRoad.model
 import com.fasterxml.jackson.annotation.JsonProperty
 
 data class RouteRequest(
-    val start: String,              // (lat,lon)
-    val end: String,                // (lat,lon)
+    val start: String,              // (lon,lat)
+    val end: String,                // (lon,lat)
     @JsonProperty("user_id")
     val userId: String,
 

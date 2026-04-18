@@ -32,8 +32,8 @@ class GraphHopperService(
 
             val requestBody = mapOf(
                 "points" to listOf(
-                    listOf(startPart[0].toDouble(), startPart[1].toDouble()),
-                    listOf(endPart[0].toDouble(), endPart[1].toDouble())
+                    listOf(startPart[1].toDouble(), startPart[0].toDouble()),
+                    listOf(endPart[1].toDouble(), endPart[0].toDouble())
                 ),
                 "profile" to profile,
                 "points_encoded" to pointsEncoded,
