@@ -34,7 +34,9 @@
 ---
 
 ## Архитектура сервера
-<img width="1178" height="320" alt="server_architecture" src="https://github.com/user-attachments/assets/610e796b-8163-4c7b-a012-8e3226eee4d6" />
+<p align="center">
+  <img src="images/server_policy.png" alt="Архитектура сервера" width="974">
+</p>
 
 
 ### Основные backend-модули
@@ -105,7 +107,18 @@ GoodRoad-Server/
 ├── GoodRoad-tests.json
 └── SETUP.md
 ```
+
+### Архитектура приложения
+<p align="center">
+  <img src="images/cloud_api.png" alt="Архитектура приложения" width="974">
+</p>
+
 ### Схема взаимодействия объектов в базе данных
 <p align="center">
   <img src="images/scheme.png" alt="Схема взаимодействия объектов в базе данных" width="974">
+</p>
+
+### Алгоритм построения маршрута на карте
+<p align="center">
+  <img src="images/user_obstacle_policy.png" alt="Алгоритм построения маршрута на карте" width="974">
 </p>
