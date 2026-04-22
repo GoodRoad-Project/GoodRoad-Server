@@ -110,7 +110,7 @@ GoodRoad-Server/
 
 ### Архитектура приложения
 <p align="center">
-  <img src="images/cloud_api.png" alt="Архитектура приложения" width="974">
+  <img src="images/cloud_API.png" alt="Архитектура приложения" width="974">
 </p>
 
 ### Схема взаимодействия объектов в базе данных
