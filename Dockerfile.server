@@ -1,7 +1,13 @@
 FROM gradle:8.3-jdk17 AS build
 WORKDIR /app
 
-# Копируем файлы для сборки зависимостей
+# Копируем сертификат
+COPY src/main/resources/graphhopper.crt /tmp/graphhopper.crt
+
+# Импортируем сертификат (правильный путь!)
+RUN keytool -import -trustcacerts -keystore /opt/java/openjdk/lib/security/cacerts -storepass changeit -noprompt -alias graphhopper -file /tmp/graphhopper.crt
+
+# Копируем файлы для сборки
 COPY build.gradle settings.gradle ./
 COPY src ./src
 
