@@ -73,7 +73,7 @@ public class ModeratorService {
     }
 
     @Transactional
-    public void disable(String id) {
+    public void disableModerator(String id) {
         Long userId = parseId(id);
         UserEntity user = users.findById(userId)
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
