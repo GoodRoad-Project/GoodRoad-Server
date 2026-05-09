@@ -37,6 +37,9 @@ public class RouteRequest {
     @JsonProperty("avoid_surfaces")
     private List<String> avoidSurfaceTypes = new ArrayList<>();
 
+    @JsonProperty("obstacle_policies")
+    private List<RouteObstaclePolicy> obstaclePolicies = new ArrayList<>();
+
     private String locale = "ru";
 
     @JsonProperty("alternatives")
@@ -44,4 +47,13 @@ public class RouteRequest {
 
     @JsonProperty("points_encoded")
     private boolean pointsEncoded = true;
+
+    @Data
+    public static class RouteObstaclePolicy {
+        @JsonProperty("obstacle_type")
+        private String obstacleType;
+
+        @JsonProperty("max_allowed_severity")
+        private Short maxAllowedSeverity;
+    }
 }
