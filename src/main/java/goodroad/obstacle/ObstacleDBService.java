@@ -2,8 +2,7 @@ package goodroad.obstacle;
 
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ReviewStatus;
-import goodroad.obstacle.repository.ObstacleFeatureEntity;
-import goodroad.obstacle.repository.ObstacleFeatureRepo;
+import goodroad.obstacle.repository.*;
 import goodroad.reviews.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -15,17 +14,20 @@ import java.util.*;
 public class ObstacleDBService {
 
     private final ObstacleFeatureRepo features;
+    private final ObstacleFeatureObstacleScoreRepo obstacleScores;
     private final ObstacleReviewRepo reviews;
     private final ObstacleReviewPhotoRepo photos;
     private final ObstacleReviewObstacleRepo reviewObstacles;
 
     public ObstacleDBService(
             ObstacleFeatureRepo features,
+            ObstacleFeatureObstacleScoreRepo obstacleScores,
             ObstacleReviewRepo reviews,
             ObstacleReviewPhotoRepo photos,
             ObstacleReviewObstacleRepo reviewObstacles
     ) {
         this.features = features;
+        this.obstacleScores = obstacleScores;
         this.reviews = reviews;
         this.photos = photos;
         this.reviewObstacles = reviewObstacles;
@@ -65,6 +67,7 @@ public class ObstacleDBService {
             double longitude,
             AddressResp address,
             Short severityEstimate,
+            Map<String, Short> obstacleSeverityEstimates,
             int reviewsCount,
             Instant lastReviewedAt
     ) {
@@ -87,14 +90,22 @@ public class ObstacleDBService {
     public List<ObstacleMapItemResp> listInBox(double minLat, double maxLat, double minLon, double maxLon) {
         validateBBox(minLat, maxLat, minLon, maxLon);
 
-        List<ObstacleMapItemResp> out = new ArrayList<>();
-        for (ObstacleFeatureEntity feature : features.findByBboxWithReviewStatus(
+        List<ObstacleFeatureEntity> rawFeatures = features.findByBboxWithReviewStatus(
                 minLat,
                 maxLat,
                 minLon,
                 maxLon,
                 ReviewStatus.APPROVED.name()
-        )) {
+        );
+
+        List<Long> featureIds = new ArrayList<>();
+        for (ObstacleFeatureEntity feature : rawFeatures) {
+            featureIds.add(feature.getId());
+        }
+
+        Map<Long, Map<String, Short>> scoresByFeature = loadScoresByFeature(featureIds);
+        List<ObstacleMapItemResp> out = new ArrayList<>();
+        for (ObstacleFeatureEntity feature : rawFeatures) {
             out.add(new ObstacleMapItemResp(
                     feature.getId().toString(),
                     feature.getType(),
@@ -102,6 +113,7 @@ public class ObstacleDBService {
                     feature.getLon(),
                     toAddress(feature),
                     feature.getSeverityEst(),
+                    scoresByFeature.getOrDefault(feature.getId(), Map.of()),
                     feature.getReviewsCount(),
                     feature.getLastReviewedAt()
             ));
@@ -154,6 +166,19 @@ public class ObstacleDBService {
                 feature.getLastReviewedAt(),
                 items
         );
+    }
+
+    private Map<Long, Map<String, Short>> loadScoresByFeature(List<Long> featureIds) {
+        Map<Long, Map<String, Short>> scoresByFeature = new LinkedHashMap<>();
+        if (featureIds.isEmpty()) {
+            return scoresByFeature;
+        }
+
+        for (ObstacleFeatureObstacleScoreEntity score : obstacleScores.findByIdFeatureIdIn(featureIds)) {
+            scoresByFeature.computeIfAbsent(score.getId().getFeatureId(), k -> new LinkedHashMap<>())
+                    .put(score.getId().getObstacleType(), score.getSeverityEstimate());
+        }
+        return scoresByFeature;
     }
 
     private Map<Long, List<String>> loadPhotosByReview(List<Long> reviewIds) {
