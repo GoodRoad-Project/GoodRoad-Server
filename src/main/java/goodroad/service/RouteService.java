@@ -10,7 +10,6 @@ import goodroad.model.gh.*;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.stream.Collectors;
 
 @Service
 public class RouteService {
@@ -40,20 +39,74 @@ public class RouteService {
         return obstacleDBService.listInBox(minLat, maxLat, minLon, maxLon);
     }
 
-    private boolean isImpossibleForUser(ObstacleDBService.ObstacleMapItemResp obstacle, RouteRequest request) {
-        switch (obstacle.type()) {
-            case "STAIRS":
-                return request.isAvoidStairs() || (request.getMaxStairsCount() != null && request.getMaxStairsCount() == 0);
-            case "ROAD_SLOPE":
-                return request.getMaxSlopeAngle() != null &&
-                        (obstacle.severityEstimate() != null ? obstacle.severityEstimate() : 0) > request.getMaxSlopeAngle();
-            case "POTHOLES":
-                return obstacle.severityEstimate() != null && obstacle.severityEstimate() == 3;
-            case "CURB":
-                return obstacle.severityEstimate() != null && obstacle.severityEstimate() == 3;
-            default:
-                return false;
+    private List<RouteRequest.RouteObstaclePolicy> getRouteObstaclePolicies(RouteRequest request) {
+        if (request.getObstaclePolicies() != null && !request.getObstaclePolicies().isEmpty()) {
+            return request.getObstaclePolicies();
         }
+
+        List<RouteRequest.RouteObstaclePolicy> policies = new ArrayList<>();
+        if (request.isAvoidStairs()) {
+            policies.add(policy("STAIRS", (short) 0));
+        }
+        if (request.getMaxCurbHeight() != null) {
+            policies.add(policy("CURB", request.getMaxCurbHeight().shortValue()));
+        }
+        if (request.getMaxSlopeAngle() != null) {
+            policies.add(policy("ROAD_SLOPE", request.getMaxSlopeAngle().shortValue()));
+        }
+        if (request.isAvoidBadRoad()) {
+            policies.add(policy("POTHOLES", (short) 0));
+        }
+        if (request.getAvoidSurfaceTypes() != null) {
+            for (String surface : request.getAvoidSurfaceTypes()) {
+                policies.add(policy(surface, (short) 0));
+            }
+        }
+        return policies;
+    }
+
+    private RouteRequest.RouteObstaclePolicy policy(String obstacleType, Short maxAllowedSeverity) {
+        RouteRequest.RouteObstaclePolicy policy = new RouteRequest.RouteObstaclePolicy();
+        policy.setObstacleType(obstacleType);
+        policy.setMaxAllowedSeverity(maxAllowedSeverity);
+        return policy;
+    }
+
+    private boolean shouldAvoidForUser(
+            ObstacleDBService.ObstacleMapItemResp obstacle,
+            RouteRequest.RouteObstaclePolicy policy
+    ) {
+        if (policy.getObstacleType() == null || policy.getMaxAllowedSeverity() == null) {
+            return false;
+        }
+
+        Short obstacleSeverity = obstacle.obstacleSeverityEstimates().get(policy.getObstacleType());
+        if (obstacleSeverity == null) {
+            return false;
+        }
+
+        return obstacleSeverity > policy.getMaxAllowedSeverity();
+    }
+
+    private List<ObstacleDBService.ObstacleMapItemResp> getAvoidedObstacles(
+            List<ObstacleDBService.ObstacleMapItemResp> obstacles,
+            RouteRequest request
+    ) {
+        List<RouteRequest.RouteObstaclePolicy> policies = getRouteObstaclePolicies(request);
+        if (policies.isEmpty()) {
+            return List.of();
+        }
+
+        List<ObstacleDBService.ObstacleMapItemResp> out = new ArrayList<>();
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
+            for (RouteRequest.RouteObstaclePolicy policy : policies) {
+                if (shouldAvoidForUser(obstacle, policy)) {
+                    out.add(obstacle);
+                    break;
+                }
+            }
+        }
+        return out;
     }
 
     private Map<String, Object> buildModelWithObstacles(List<ObstacleDBService.ObstacleMapItemResp> obstacles, RouteRequest request) {
@@ -90,14 +143,11 @@ public class RouteService {
 
     public RouteResponse buildThreeRoutes(RouteRequest request) {
         List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(request.getStart(), request.getEnd());
-
-        List<ObstacleDBService.ObstacleMapItemResp> impossibleObstacles = obstacles.stream()
-                .filter(obstacle -> isImpossibleForUser(obstacle, request))
-                .collect(Collectors.toList());
+        List<ObstacleDBService.ObstacleMapItemResp> avoidedObstacles = getAvoidedObstacles(obstacles, request);
 
         Map<String, Object> fastModel = null;
-        Map<String, Object> balancedModel = buildModelWithObstacles(impossibleObstacles, request);
-        Map<String, Object> safeModel = buildModelWithObstacles(obstacles, request);
+        Map<String, Object> balancedModel = buildModelWithObstacles(avoidedObstacles, request);
+        Map<String, Object> safeModel = buildModelWithObstacles(avoidedObstacles, request);
 
         CompletableFuture<GraphHopperResponse> fastFuture = CompletableFuture.supplyAsync(() ->
                 graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", fastModel)

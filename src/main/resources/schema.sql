@@ -45,6 +45,20 @@ create index if not exists ix_obstacle_feature_address_lookup
 create unique index if not exists uq_obstacle_feature_type_address
     on obstacle_feature(type, country, region, locality_type, city, street, house, coalesce(place_name, ''));
 
+create table if not exists obstacle_feature_obstacle_score (
+    feature_id          bigint not null references obstacle_feature(id) on delete cascade,
+    obstacle_type       varchar(32) not null
+        check (obstacle_type in ('CURB', 'STAIRS', 'ROAD_SLOPE', 'POTHOLES', 'SAND', 'GRAVEL')),
+    severity_estimate   smallint not null
+        check (severity_estimate between 1 and 3),
+    reviews_count       integer not null default 0
+        check (reviews_count >= 0),
+    primary key (feature_id, obstacle_type)
+);
+
+create index if not exists ix_obstacle_feature_obstacle_score_type
+    on obstacle_feature_obstacle_score(obstacle_type);
+
 create table if not exists user_obstacle_policy (
     user_id              bigint not null references users(id) on delete cascade,
     obstacle_type        varchar(32) not null
