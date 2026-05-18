@@ -30,6 +30,9 @@ services:
       DB_PASS: ${DB_PASS}
       ADMIN_PHONE: ${ADMIN_PHONE}
       ADMIN_PASS: ${ADMIN_PASS}
+      YC_ACCESS_KEY: ${YC_ACCESS_KEY}
+      YC_SECRET_KEY: ${YC_SECRET_KEY}
+      YC_BUCKET: ${YC_BUCKET}
     depends_on:
       db:
         condition: service_healthy
