@@ -15,6 +15,14 @@ spring:
       ddl-auto: validate
     open-in-view: false
 
+yandex:
+  storage:
+    endpoint: https://storage.yandexcloud.net
+    bucket: ${YC_BUCKET}
+    region: ru-central1
+    access-key: ${YC_ACCESS_KEY}
+    secret-key: ${YC_SECRET_KEY}
+
 app:
   admin:
     phone: ${ADMIN_PHONE}
@@ -27,3 +35,4 @@ logging:
     org.springframework: INFO
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%logger{36}] - %msg%n"
+
