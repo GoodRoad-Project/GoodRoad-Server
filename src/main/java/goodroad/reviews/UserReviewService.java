@@ -14,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import goodroad.reviews.repository.*;
+import goodroad.storage.StorageService;
+import org.springframework.web.multipart.MultipartFile;
+
+
 
 @Service
 public class UserReviewService {
@@ -22,12 +26,17 @@ public class UserReviewService {
     private static final String STATUS_APPROVED = "APPROVED";
     private static final String STATUS_REJECTED = "REJECTED";
 
+    private static final long MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+    private static final Set<String> ALLOWED_PHOTO_TYPES =
+            Set.of("image/jpeg", "image/png", "image/webp");
+
     private final UserRepo users;
     private final ObstacleFeatureRepo features;
     private final ObstacleReviewRepo reviews;
     private final ObstacleReviewPhotoRepo photos;
     private final ObstacleReviewObstacleRepo reviewObstacles;
     private final ReviewSupportService reviewSupport;
+    private final StorageService storageService;
 
     public UserReviewService(
             UserRepo users,
@@ -35,7 +44,8 @@ public class UserReviewService {
             ObstacleReviewRepo reviews,
             ObstacleReviewPhotoRepo photos,
             ObstacleReviewObstacleRepo reviewObstacles,
-            ReviewSupportService reviewSupport
+            ReviewSupportService reviewSupport,
+            StorageService storageService
     ) {
         this.users = users;
         this.features = features;
@@ -43,6 +53,7 @@ public class UserReviewService {
         this.photos = photos;
         this.reviewObstacles = reviewObstacles;
         this.reviewSupport = reviewSupport;
+        this.storageService = storageService;
     }
 
     public record AddressReq(
@@ -91,6 +102,11 @@ public class UserReviewService {
     }
 
     public record ReviewPointsResp(int totalPoints, long approvedReviews) {
+    }
+
+    public record ReviewPhotoUploadResp(
+            String photoUrl
+    ) {
     }
 
     @Transactional(readOnly = true)
@@ -293,6 +309,48 @@ public class UserReviewService {
                     .build();
             photos.save(photo);
         }
+    }
+
+    @Transactional
+    public ReviewPhotoUploadResp uploadReviewPhoto(
+            String phoneFromAuth,
+            MultipartFile file
+    ) {
+
+        if (file == null || file.isEmpty()) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "PHOTO_EMPTY",
+                    "Photo file is empty"
+            );
+        }
+
+        if (file.getSize() > MAX_PHOTO_SIZE) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "PHOTO_TOO_LARGE",
+                    "Photo file is too large"
+            );
+        }
+
+        if (file.getContentType() == null
+                || !ALLOWED_PHOTO_TYPES.contains(file.getContentType())) {
+
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "PHOTO_TYPE_INVALID",
+                    "Photo file type is invalid"
+            );
+        }
+
+        UserEntity user = findCurrent(phoneFromAuth);
+
+        String photoUrl = storageService.uploadReviewPhoto(
+                file,
+                user.getId().toString()
+        );
+
+        return new ReviewPhotoUploadResp(photoUrl);
     }
 
     private ObstacleFeatureEntity resolveOrCreateFeature(ValidatedReviewInput input) {
