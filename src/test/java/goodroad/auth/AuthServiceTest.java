@@ -43,8 +43,8 @@ class AuthServiceTest {
                 });
 
         AuthService.RegisterReq req = new AuthService.RegisterReq(
-                "Ivan",
-                "Ivanov",
+                "Иван",
+                "Иванов",
                 "+79990001122",
                 "pass123"
         );
@@ -65,8 +65,8 @@ class AuthServiceTest {
                 .thenReturn(Optional.of(new UserEntity()));
 
         AuthService.RegisterReq req = new AuthService.RegisterReq(
-                "Ivan",
-                "Ivanov",
+                "Иван",
+                "Иванов",
                 "+79990001122",
                 "pass123"
         );
