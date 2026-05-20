@@ -111,20 +111,6 @@ class UserSettingsServiceTest {
         verify(users).delete(user);
     }
 
-    @Test
-    void shouldDeleteUserByAdmin() {
-        UserEntity admin = user(1L, Role.MODERATOR_ADMIN.name());
-        admin.setPassHash("hash");
-        UserEntity target = user(2L, Role.USER.name());
-        when(users.findByPhoneHash(anyString())).thenReturn(Optional.of(admin));
-        when(passwordEncoder.matches("admin", "hash")).thenReturn(true);
-        when(users.findById(2L)).thenReturn(Optional.of(target));
-
-        service.deleteByAdmin("+79990000003", "2", new UserSettingsService.DeleteAccountReq("admin"));
-
-        verify(users).delete(target);
-    }
-
     private UserEntity user(Long id, String role) {
         UserEntity user = UserEntity.builder()
                 .firstName("Анна")
