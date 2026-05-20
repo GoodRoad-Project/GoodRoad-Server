@@ -98,7 +98,7 @@ public class ModeratorService {
 
     @Transactional(readOnly = true)
     public List<ModeratorView> getAllModerators() {
-        return users.findByRoleIn(List.of(Role.MODERATOR.name(), Role.MODERATOR_ADMIN.name())).stream()
+        return users.findByRoleIn(List.of(Role.MODERATOR.name())).stream()
                 .map(this::toView)
                 .toList();
     }

@@ -81,7 +81,7 @@ class ModeratorServiceTest {
     }
 
     @Test
-    void shouldReturnModerators() {
+    void shouldReturnOnlyRegularModerators() {
         UserEntity moderator = UserEntity.builder()
                 .firstName("Анна")
                 .lastName("Иванова")
@@ -89,7 +89,8 @@ class ModeratorServiceTest {
                 .active(true)
                 .build();
         moderator.setId(10L);
-        when(users.findByRoleIn(List.of(Role.MODERATOR.name(), Role.MODERATOR_ADMIN.name())))
+
+        when(users.findByRoleIn(List.of(Role.MODERATOR.name())))
                 .thenReturn(List.of(moderator));
 
         List<ModeratorService.ModeratorView> result = service.getAllModerators();
@@ -97,5 +98,6 @@ class ModeratorServiceTest {
         assertEquals(1, result.size());
         assertEquals("10", result.get(0).id());
         assertEquals(Role.MODERATOR.name(), result.get(0).role());
+        verify(users).findByRoleIn(List.of(Role.MODERATOR.name()));
     }
 }
