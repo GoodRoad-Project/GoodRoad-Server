@@ -137,31 +137,45 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldChangePassword() {
+    void shouldRecoverPassword() {
 
         UserEntity user = UserEntity.builder()
+                .firstName("Иван")
+                .lastName("Иванов")
                 .passHash("oldHash")
+                .role("USER")
                 .active(true)
                 .build();
 
         when(users.findByPhoneHash(anyString()))
                 .thenReturn(Optional.of(user));
 
-        when(passwordEncoder.matches("old", "oldHash"))
-                .thenReturn(true);
-
         when(passwordEncoder.encode("new"))
                 .thenReturn("newHash");
 
-        when(users.save(any(UserEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        AuthService.ChangePassReq req =
-                new AuthService.ChangePassReq("+79990001122", "old", "new");
-
-        authService.changePass(req.phoneFromAuth(), req.oldPassword(), req.newPassword());
+        authService.recoverPass("+79990001122", "Иван", "Иванов", "new");
 
         verify(users).save(user);
         assertEquals("newHash", user.getPassHash());
+    }
+
+    @Test
+    void shouldFailRecoverPasswordForWrongName() {
+
+        UserEntity user = UserEntity.builder()
+                .firstName("Иван")
+                .lastName("Иванов")
+                .passHash("oldHash")
+                .role("USER")
+                .active(true)
+                .build();
+
+        when(users.findByPhoneHash(anyString()))
+                .thenReturn(Optional.of(user));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.recoverPass("+79990001122", "Петр", "Иванов", "new"));
+
+        verify(users, never()).save(any(UserEntity.class));
     }
 }

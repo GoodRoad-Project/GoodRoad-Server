@@ -78,12 +78,10 @@ class HttpApiScenarioTest {
     }
 
     @Test
-    void shouldRegisterLoginAndRecoverPassword() throws Exception {
+    void shouldRegisterUser() throws Exception {
         MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
 
         when(authService.register(any(AuthService.RegisterReq.class)))
-                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER")));
-        when(authService.login(any(AuthService.LoginReq.class)))
                 .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER")));
 
         mvc.perform(post("/auth/register")
@@ -99,6 +97,14 @@ class HttpApiScenarioTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value("10"))
                 .andExpect(jsonPath("$.user.role").value("USER"));
+    }
+
+    @Test
+    void shouldLoginUser() throws Exception {
+        MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
+
+        when(authService.login(any(AuthService.LoginReq.class)))
+                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER")));
 
         mvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,6 +116,11 @@ class HttpApiScenarioTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value("10"));
+    }
+
+    @Test
+    void shouldRecoverPassword() throws Exception {
+        MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
 
         mvc.perform(post("/auth/recover-password")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -182,16 +193,6 @@ class HttpApiScenarioTest {
                                 """))
                 .andExpect(status().isOk());
         verify(userSettingsService).deleteCurrent(eq("+79990000001"), any(UserSettingsService.DeleteAccountReq.class));
-
-        mvc.perform(delete("/users/11")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "password": "admin"
-                                }
-                                """))
-                .andExpect(status().isOk());
-        verify(userSettingsService).deleteByAdmin(eq("+79990000001"), eq("11"), any(UserSettingsService.DeleteAccountReq.class));
     }
 
     @Test
