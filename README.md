@@ -100,7 +100,7 @@ GoodRoad-Server/
 │       │   └── users/
 │       └── resources/
 │           ├── application.yml
-│           └── schema.sql
+│           └── db/migration/V1__init_schema.sql
 ├── Dockerfile.server
 ├── docker-compose.yml
 ├── build.gradle
