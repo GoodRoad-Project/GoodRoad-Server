@@ -5,10 +5,15 @@ spring:
     password: ${DB_PASS}
     driver-class-name: org.postgresql.Driver
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+
   sql:
     init:
-      mode: always
-      schema-locations: classpath:schema.sql
+      mode: never
 
   jpa:
     hibernate:
