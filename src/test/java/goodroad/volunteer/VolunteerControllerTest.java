@@ -29,7 +29,7 @@ class VolunteerControllerTest {
     void shouldReturnVolunteerMenu() throws Exception {
         MockMvc mvc = standaloneSetup(new VolunteerController(service)).build();
         when(service.getMenu("+79990000001"))
-                .thenReturn(new VolunteerService.VolunteerMenuResp(true, "APPROVED", null, null));
+                .thenReturn(new VolunteerService.VolunteerMenuResp(true, "APPROVED", null));
 
         mvc.perform(get("/volunteer/menu").principal(principal("+79990000001")))
                 .andExpect(status().isOk())
@@ -157,20 +157,15 @@ class VolunteerControllerTest {
     }
 
     @Test
-    void shouldUseWalkAndSosEndpoints() throws Exception {
+    void shouldUseWalkEndpoints() throws Exception {
         MockMvc mvc = standaloneSetup(new VolunteerController(service)).build();
         Principal user = principal("+79990000001");
-        VolunteerService.HelpRequestResp active = helpRequest("20", "2", "IN_PROGRESS", true, true, false);
+        VolunteerService.HelpRequestResp active = helpRequest("20", "2", "ACCEPTED", true, true, false);
         VolunteerService.HelpRequestResp completed = helpRequest("20", "2", "COMPLETED", true, true, true);
-        VolunteerService.SosResp sos = sos("30", "20", "MANUAL", "OPEN");
-        VolunteerService.ComplaintResp complaint = complaint("40", "20", "PENDING");
 
         when(service.setWalkRoute(eq("+79990000001"), eq("20"), any(VolunteerService.WalkRouteReq.class))).thenReturn(active);
         when(service.startWalk(eq("+79990000001"), eq("20"), any(VolunteerService.WalkRouteReq.class))).thenReturn(active);
-        when(service.updateLocation(eq("+79990000001"), eq("20"), any(VolunteerService.LocationReq.class))).thenReturn(active);
         when(service.finishWalk("+79990000001", "20")).thenReturn(completed);
-        when(service.sendSos(eq("+79990000001"), eq("20"), any(VolunteerService.SosReq.class))).thenReturn(sos);
-        when(service.createComplaint(eq("+79990000001"), eq("20"), any(VolunteerService.ComplaintReq.class))).thenReturn(complaint);
 
         mvc.perform(post("/volunteer/requests/20/route")
                         .principal(user)
@@ -184,52 +179,11 @@ class VolunteerControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(routeJson()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
-
-        mvc.perform(post("/volunteer/requests/20/location")
-                        .principal(user)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "latitude": 59.93,
-                                  "longitude": 30.31
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("20"));
-
-        mvc.perform(post("/volunteer/requests/20/sos")
-                        .principal(user)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "comment": "Нужна помощь"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("OPEN"));
-
-        mvc.perform(post("/volunteer/requests/20/complaints")
-                        .principal(user)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "text": "Волонтер не пришел"
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"));
+                .andExpect(jsonPath("$.status").value("ACCEPTED"));
 
         mvc.perform(post("/volunteer/requests/20/finish").principal(user))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.completed").value(true));
-
-        verify(service).updateLocation(eq("+79990000001"), eq("20"), argThat(req ->
-                Double.valueOf(59.93).equals(req.latitude()) && Double.valueOf(30.31).equals(req.longitude())
-        ));
-        verify(service).sendSos(eq("+79990000001"), eq("20"), argThat(req ->
-                "Нужна помощь".equals(req.comment())
-        ));
     }
 
     private Principal principal(String phone) {
@@ -258,21 +212,6 @@ class VolunteerControllerTest {
                 contactsVisible ? "@user" : null,
                 "Нужно помочь дойти до метро", status, contactsVisible, true, started, completed,
                 Instant.parse("2026-05-01T10:00:00Z")
-        );
-    }
-
-    private VolunteerService.SosResp sos(String id, String requestId, String reason, String status) {
-        return new VolunteerService.SosResp(
-                id, requestId, reason, "Нужна помощь", status, null,
-                "Иван Петров", "Анна Иванова", "79990000001", "79990000002", "@user", "@volunteer",
-                Instant.parse("2026-05-01T10:00:00Z"), null
-        );
-    }
-
-    private VolunteerService.ComplaintResp complaint(String id, String requestId, String status) {
-        return new VolunteerService.ComplaintResp(
-                id, requestId, "1", "2", "Волонтер не пришел", status, null,
-                Instant.parse("2026-05-01T10:00:00Z"), null
         );
     }
 

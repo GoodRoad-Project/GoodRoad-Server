@@ -1,5 +1,6 @@
 package goodroad.volunteer;
 
+import goodroad.api.ApiErrors.ApiException;
 import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
@@ -36,16 +37,7 @@ class VolunteerServiceTest {
     private VolunteerApplicationPhotoRepo applicationPhotos;
 
     @Mock
-    private VolunteerUserStateRepo states;
-
-    @Mock
     private HelpRequestRepo requests;
-
-    @Mock
-    private VolunteerComplaintRepo complaints;
-
-    @Mock
-    private SosNotificationRepo sosNotifications;
 
     @Mock
     private StorageService storageService;
@@ -86,12 +78,9 @@ class VolunteerServiceTest {
         UserEntity applicant = user(1L, "USER", "+79990000001");
         UserEntity moderator = user(2L, "MODERATOR", "+79990000002");
         VolunteerApplicationEntity application = application(20L, applicant, "PENDING");
-        VolunteerUserStateEntity state = state(applicant);
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(moderator));
         when(applications.findById(20L)).thenReturn(Optional.of(application));
         when(applications.save(application)).thenReturn(application);
-        when(states.findById(1L)).thenReturn(Optional.empty());
-        when(states.save(any(VolunteerUserStateEntity.class))).thenReturn(state);
 
         VolunteerService.VolunteerApplicationResp result = service.approveApplication("+79990000002", "20");
 
@@ -145,7 +134,7 @@ class VolunteerServiceTest {
             request.setCreatedAt(Instant.now());
             return request;
         });
-        when(requests.findById(30L)).thenAnswer(invocation -> Optional.of(helpRequest(30L, requester, null, "OPEN")));
+        when(requests.findById(30L)).thenReturn(Optional.of(helpRequest(30L, requester, null, "OPEN")));
 
         VolunteerService.HelpRequestResp created = service.createHelpRequest("+79990000001", helpRequestReq());
         VolunteerService.HelpRequestResp details = service.getHelpRequest("+79990000002", "30");
@@ -163,7 +152,6 @@ class VolunteerServiceTest {
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         HelpRequestEntity request = helpRequest(30L, requester, null, "OPEN");
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(states.findById(2L)).thenReturn(Optional.empty());
         when(requests.findById(30L)).thenReturn(Optional.of(request));
         when(requests.save(request)).thenReturn(request);
 
@@ -177,7 +165,7 @@ class VolunteerServiceTest {
     }
 
     @Test
-    void shouldWithdrawResponseAndSubtractFiftyPoints() {
+    void shouldWithdrawResponseWithoutPenalty() {
         UserEntity requester = user(1L, "USER", "+79990000001");
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         volunteer.setTotalPoints(80);
@@ -190,8 +178,8 @@ class VolunteerServiceTest {
 
         assertEquals("OPEN", result.status());
         assertNull(request.getVolunteer());
-        assertEquals(30, volunteer.getTotalPoints());
-        verify(users).save(volunteer);
+        assertEquals(80, volunteer.getTotalPoints());
+        verify(users, never()).save(volunteer);
     }
 
     @Test
@@ -204,6 +192,8 @@ class VolunteerServiceTest {
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
         when(requests.findById(30L)).thenReturn(Optional.of(request));
+        when(requests.findByRequesterIdAndStatus(1L, "ACCEPTED")).thenReturn(List.of());
+        when(requests.findByVolunteerIdAndStatus(2L, "ACCEPTED")).thenReturn(List.of());
         when(requests.save(request)).thenReturn(request);
 
         VolunteerService.HelpRequestResp afterRequester = service.startWalk("+79990000001", "30", routeReq());
@@ -216,51 +206,45 @@ class VolunteerServiceTest {
     }
 
     @Test
-    void shouldCreateSosWhenParticipantIsMoreThanOneKilometerAwayFromRoute() {
+    void shouldBlockRequesterFromStartingNewWalkBeforeStoppingPreviousOne() {
         UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        request.setStartedAt(Instant.now());
-        request.setPlannedRoutePoints("59.93,30.31;59.93,30.32");
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
-        when(requests.save(request)).thenReturn(request);
-        when(applications.findFirstByApplicantIdOrderByCreatedAtDesc(2L)).thenReturn(Optional.empty());
-        when(sosNotifications.save(any(SosNotificationEntity.class))).thenAnswer(invocation -> {
-            SosNotificationEntity sos = invocation.getArgument(0);
-            sos.setId(100L);
-            sos.setCreatedAt(Instant.now());
-            return sos;
-        });
+        UserEntity oldVolunteer = user(2L, "VOLUNTEER", "+79990000002");
+        UserEntity newVolunteer = user(3L, "VOLUNTEER", "+79990000003");
+        HelpRequestEntity active = helpRequest(30L, requester, oldVolunteer, "ACCEPTED");
+        active.setStartedAt(Instant.now().minus(Duration.ofHours(1)));
+        HelpRequestEntity next = helpRequest(31L, requester, newVolunteer, "ACCEPTED");
 
-        service.updateLocation("+79990000002", "30", new VolunteerService.LocationReq(59.95, 30.31));
+        when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
+        when(requests.findById(31L)).thenReturn(Optional.of(next));
+        when(requests.findByRequesterIdAndStatus(1L, "ACCEPTED")).thenReturn(List.of(active, next));
 
-        verify(sosNotifications).save(argThat(sos -> "ROUTE_DEVIATION".equals(sos.getReason())));
+        ApiException ex = assertThrows(ApiException.class, () -> service.startWalk("+79990000001", "31", null));
+        assertEquals("ACTIVE_WALK_EXISTS", ex.code());
     }
 
     @Test
-    void shouldNotCreateSosWhenParticipantIsCloseToRoute() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
+    void shouldBlockVolunteerFromStartingNewWalkBeforeStoppingPreviousOne() {
+        UserEntity firstRequester = user(1L, "USER", "+79990000001");
+        UserEntity secondRequester = user(3L, "USER", "+79990000003");
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        request.setStartedAt(Instant.now());
-        request.setPlannedRoutePoints("59.93,30.31;59.93,30.32");
+        HelpRequestEntity active = helpRequest(30L, firstRequester, volunteer, "ACCEPTED");
+        active.setStartedAt(Instant.now().minus(Duration.ofHours(1)));
+        HelpRequestEntity next = helpRequest(31L, secondRequester, volunteer, "ACCEPTED");
+
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
-        when(requests.save(request)).thenReturn(request);
+        when(requests.findById(31L)).thenReturn(Optional.of(next));
+        when(requests.findByVolunteerIdAndStatus(2L, "ACCEPTED")).thenReturn(List.of(active, next));
 
-        service.updateLocation("+79990000002", "30", new VolunteerService.LocationReq(59.9305, 30.315));
-
-        verifyNoInteractions(sosNotifications);
+        ApiException ex = assertThrows(ApiException.class, () -> service.startWalk("+79990000002", "31", null));
+        assertEquals("ACTIVE_WALK_EXISTS", ex.code());
     }
 
     @Test
-    void shouldFinishWalkAndAddRewardAfterBothParticipantsFinish() {
+    void shouldCompleteWalkAndAddVolunteerPointsAfterBothParticipantsFinish() {
         UserEntity requester = user(1L, "USER", "+79990000001");
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        volunteer.setTotalPoints(20);
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        request.setStartedAt(Instant.now());
+        request.setStartedAt(Instant.now().minus(Duration.ofMinutes(30)));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
         when(requests.findById(30L)).thenReturn(Optional.of(request));
@@ -272,162 +256,35 @@ class VolunteerServiceTest {
         assertFalse(afterRequester.completed());
         assertTrue(afterVolunteer.completed());
         assertEquals("COMPLETED", request.getStatus());
-        assertEquals(120, volunteer.getTotalPoints());
-        verify(users).save(volunteer);
-    }
-
-    @Test
-    void shouldApplyVolunteerComplaintPenaltyAndWeekBanOnThirdWarning() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        UserEntity moderator = user(3L, "MODERATOR", "+79990000003");
-        volunteer.setTotalPoints(200);
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        VolunteerComplaintEntity complaint = complaint(40L, request, requester, volunteer);
-        VolunteerUserStateEntity state = state(volunteer);
-        state.setVolunteerWarnings(2);
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000003"))).thenReturn(Optional.of(moderator));
-        when(complaints.findById(40L)).thenReturn(Optional.of(complaint));
-        when(users.findById(2L)).thenReturn(Optional.of(volunteer));
-        when(states.findById(2L)).thenReturn(Optional.of(state));
-        when(states.save(state)).thenReturn(state);
-        when(complaints.save(complaint)).thenReturn(complaint);
-
-        VolunteerService.ComplaintResp result = service.resolveComplaint(
-                "+79990000003",
-                "40",
-                new VolunteerService.ResolveComplaintReq("2", "Волонтер не пришел")
-        );
-
-        assertEquals("RESOLVED", result.status());
         assertEquals(100, volunteer.getTotalPoints());
-        assertEquals(0, state.getVolunteerWarnings());
-        assertNotNull(state.getVolunteerBannedUntil());
-        assertTrue(state.getVolunteerBannedUntil().isAfter(Instant.now().plus(Duration.ofDays(6))));
-    }
-
-    @Test
-    void shouldRejectAvailableRequestsForBannedVolunteer() {
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        VolunteerUserStateEntity state = state(volunteer);
-        state.setVolunteerBannedUntil(Instant.now().plus(Duration.ofDays(1)));
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(states.findById(2L)).thenReturn(Optional.of(state));
-
-        assertThrows(RuntimeException.class, () -> service.listAvailableRequests("+79990000002", 59.93, 30.31));
-    }
-
-
-    @Test
-    void shouldConfirmSosAndKeepItOpenUntilResolved() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        UserEntity moderator = user(3L, "MODERATOR", "+79990000003");
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        SosNotificationEntity sos = sos(100L, request, requester, "MANUAL", "OPEN");
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000003"))).thenReturn(Optional.of(moderator));
-        when(sosNotifications.findById(100L)).thenReturn(Optional.of(sos));
-        when(sosNotifications.save(sos)).thenReturn(sos);
-        when(applications.findFirstByApplicantIdOrderByCreatedAtDesc(2L)).thenReturn(Optional.empty());
-
-        VolunteerService.SosResp result = service.confirmSos(
-                "+79990000003",
-                "100",
-                new VolunteerService.ResolveSosReq("Связались с участниками")
-        );
-
-        assertEquals("CONFIRMED", result.status());
-        assertEquals("CONFIRMED", sos.getStatus());
-        assertEquals(moderator, sos.getModerator());
-        assertEquals("Связались с участниками", sos.getModeratorComment());
-        assertNull(sos.getResolvedAt());
-    }
-
-    @Test
-    void shouldMarkSosAsFalseAlarmAndCloseIt() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        UserEntity moderator = user(3L, "MODERATOR", "+79990000003");
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        SosNotificationEntity sos = sos(100L, request, requester, "MANUAL", "OPEN");
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000003"))).thenReturn(Optional.of(moderator));
-        when(sosNotifications.findById(100L)).thenReturn(Optional.of(sos));
-        when(sosNotifications.save(sos)).thenReturn(sos);
-        when(applications.findFirstByApplicantIdOrderByCreatedAtDesc(2L)).thenReturn(Optional.empty());
-
-        VolunteerService.SosResp result = service.markSosFalseAlarm(
-                "+79990000003",
-                "100",
-                new VolunteerService.ResolveSosReq("Ошибочное нажатие")
-        );
-
-        assertEquals("FALSE_ALARM", result.status());
-        assertEquals("FALSE_ALARM", sos.getStatus());
-        assertNotNull(sos.getResolvedAt());
-    }
-
-    @Test
-    void shouldResolveConfirmedSos() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        UserEntity moderator = user(3L, "MODERATOR", "+79990000003");
-        HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        SosNotificationEntity sos = sos(100L, request, volunteer, "ROUTE_DEVIATION", "CONFIRMED");
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000003"))).thenReturn(Optional.of(moderator));
-        when(sosNotifications.findById(100L)).thenReturn(Optional.of(sos));
-        when(sosNotifications.save(sos)).thenReturn(sos);
-        when(applications.findFirstByApplicantIdOrderByCreatedAtDesc(2L)).thenReturn(Optional.empty());
-
-        VolunteerService.SosResp result = service.resolveSos(
-                "+79990000003",
-                "100",
-                new VolunteerService.ResolveSosReq("Участники в безопасности")
-        );
-
-        assertEquals("RESOLVED", result.status());
-        assertEquals("RESOLVED", sos.getStatus());
-        assertNotNull(sos.getResolvedAt());
-    }
-
-    @Test
-    void shouldListOnlyOpenAndConfirmedSosInActiveModerationList() {
-        when(sosNotifications.findByStatusInOrderByCreatedAtDesc(List.of("OPEN", "CONFIRMED"))).thenReturn(List.of());
-
-        service.listSosNotifications();
-
-        verify(sosNotifications).findByStatusInOrderByCreatedAtDesc(List.of("OPEN", "CONFIRMED"));
-        verify(sosNotifications, never()).findAllByOrderByCreatedAtDesc();
+        verify(users).save(volunteer);
     }
 
     private VolunteerService.HelpRequestReq helpRequestReq() {
         return new VolunteerService.HelpRequestReq(
-                "Санкт-Петербург, Садовая улица, дом 12",
-                "Санкт-Петербург, Невский проспект, дом 1",
-                LocalDate.now().plusDays(1).format(DATE_FORMAT),
+                "Садовая улица, 12",
+                "Невский проспект, 1",
+                DATE_FORMAT.format(LocalDate.now().plusDays(1)),
                 "12:30",
                 "+79990000001",
                 "@requester",
-                "Нужно помочь пройти маршрут"
+                "Нужно помочь дойти до остановки"
         );
     }
 
     private VolunteerService.WalkRouteReq routeReq() {
-        return new VolunteerService.WalkRouteReq(
-                null,
-                List.of(
-                        new VolunteerService.RoutePointReq(59.93, 30.31),
-                        new VolunteerService.RoutePointReq(59.93, 30.32)
-                )
-        );
+        return new VolunteerService.WalkRouteReq(null, List.of(
+                new VolunteerService.RoutePointReq(59.93, 30.31),
+                new VolunteerService.RoutePointReq(59.93, 30.32)
+        ));
     }
 
     private UserEntity user(Long id, String role, String phone) {
         UserEntity user = UserEntity.builder()
-                .firstName("Имя" + id)
-                .lastName("Фамилия" + id)
+                .firstName("Иван")
+                .lastName("Петров")
                 .phoneHash(Crypto.sha256Hex(Crypto.normPhone(phone)))
                 .role(role)
-                .passHash("hash")
                 .active(true)
                 .totalPoints(0)
                 .build();
@@ -443,15 +300,8 @@ class VolunteerServiceTest {
         application.setPhone("79990000001");
         application.setSocialNickname("@volunteer");
         application.setStatus(status);
-        application.setCreatedAt(Instant.now());
+        application.setCreatedAt(Instant.parse("2026-05-01T10:00:00Z"));
         return application;
-    }
-
-    private VolunteerUserStateEntity state(UserEntity user) {
-        VolunteerUserStateEntity state = new VolunteerUserStateEntity();
-        state.setUser(user);
-        state.setUserId(user.getId());
-        return state;
     }
 
     private HelpRequestEntity helpRequest(Long id, UserEntity requester, UserEntity volunteer, String status) {
@@ -459,40 +309,15 @@ class VolunteerServiceTest {
         request.setId(id);
         request.setRequester(requester);
         request.setVolunteer(volunteer);
-        request.setFromAddress("Санкт-Петербург, Садовая улица, дом 12");
-        request.setToAddress("Санкт-Петербург, Невский проспект, дом 1");
+        request.setFromAddress("Садовая улица, 12");
+        request.setToAddress("Невский проспект, 1");
         request.setDate(LocalDate.now().plusDays(1));
         request.setTime(LocalTime.of(12, 30));
         request.setPhone("79990000001");
         request.setSocialNickname("@requester");
-        request.setComment("Нужно помочь пройти маршрут");
+        request.setComment("Нужно помочь дойти до остановки");
         request.setStatus(status);
-        request.setCreatedAt(Instant.now());
+        request.setCreatedAt(Instant.parse("2026-05-01T10:00:00Z"));
         return request;
-    }
-
-
-    private SosNotificationEntity sos(Long id, HelpRequestEntity request, UserEntity sender, String reason, String status) {
-        SosNotificationEntity sos = new SosNotificationEntity();
-        sos.setId(id);
-        sos.setRequest(request);
-        sos.setSender(sender);
-        sos.setReason(reason);
-        sos.setStatus(status);
-        sos.setComment("Комментарий SOS");
-        sos.setCreatedAt(Instant.now());
-        return sos;
-    }
-
-    private VolunteerComplaintEntity complaint(Long id, HelpRequestEntity request, UserEntity author, UserEntity target) {
-        VolunteerComplaintEntity complaint = new VolunteerComplaintEntity();
-        complaint.setId(id);
-        complaint.setRequest(request);
-        complaint.setAuthor(author);
-        complaint.setTarget(target);
-        complaint.setText("Жалоба");
-        complaint.setStatus("PENDING");
-        complaint.setCreatedAt(Instant.now());
-        return complaint;
     }
 }
