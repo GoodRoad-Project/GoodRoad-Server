@@ -70,17 +70,6 @@ public class HelpRequestEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
-    @Column(name = "requester_latitude")
-    private Double requesterLatitude;
-
-    @Column(name = "requester_longitude")
-    private Double requesterLongitude;
-
-    @Column(name = "volunteer_latitude")
-    private Double volunteerLatitude;
-
-    @Column(name = "volunteer_longitude")
-    private Double volunteerLongitude;
 
     @Column(name = "planned_route_points", columnDefinition = "text")
     private String plannedRoutePoints;
@@ -132,14 +121,6 @@ public class HelpRequestEntity {
     public void setVolunteerFinishedAt(Instant volunteerFinishedAt) { this.volunteerFinishedAt = volunteerFinishedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
-    public Double getRequesterLatitude() { return requesterLatitude; }
-    public void setRequesterLatitude(Double requesterLatitude) { this.requesterLatitude = requesterLatitude; }
-    public Double getRequesterLongitude() { return requesterLongitude; }
-    public void setRequesterLongitude(Double requesterLongitude) { this.requesterLongitude = requesterLongitude; }
-    public Double getVolunteerLatitude() { return volunteerLatitude; }
-    public void setVolunteerLatitude(Double volunteerLatitude) { this.volunteerLatitude = volunteerLatitude; }
-    public Double getVolunteerLongitude() { return volunteerLongitude; }
-    public void setVolunteerLongitude(Double volunteerLongitude) { this.volunteerLongitude = volunteerLongitude; }
     public String getPlannedRoutePoints() { return plannedRoutePoints; }
     public void setPlannedRoutePoints(String plannedRoutePoints) { this.plannedRoutePoints = plannedRoutePoints; }
 }
