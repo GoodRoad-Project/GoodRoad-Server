@@ -109,31 +109,4 @@ public class VolunteerController {
     public VolunteerService.HelpRequestResp finishWalk(Authentication authentication, @PathVariable String id) {
         return service.finishWalk(authentication.getName(), id);
     }
-
-    @PostMapping("/requests/{id}/location")
-    public VolunteerService.HelpRequestResp updateLocation(
-            Authentication authentication,
-            @PathVariable String id,
-            @RequestBody VolunteerService.LocationReq req
-    ) {
-        return service.updateLocation(authentication.getName(), id, req);
-    }
-
-    @PostMapping("/requests/{id}/sos")
-    public VolunteerService.SosResp sendSos(
-            Authentication authentication,
-            @PathVariable String id,
-            @RequestBody(required = false) VolunteerService.SosReq req
-    ) {
-        return service.sendSos(authentication.getName(), id, req);
-    }
-
-    @PostMapping("/requests/{id}/complaints")
-    public VolunteerService.ComplaintResp createComplaint(
-            Authentication authentication,
-            @PathVariable String id,
-            @RequestBody VolunteerService.ComplaintReq req
-    ) {
-        return service.createComplaint(authentication.getName(), id, req);
-    }
 }
