@@ -18,74 +18,54 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
 public class VolunteerService {
-    private static final int VOLUNTEER_CANCEL_PENALTY = 50;
     private static final int WALK_REWARD = 100;
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     private final UserRepo users;
     private final VolunteerApplicationRepo applications;
     private final VolunteerApplicationPhotoRepo applicationPhotos;
-    private final VolunteerUserStateRepo states;
     private final HelpRequestRepo requests;
-    private final VolunteerComplaintRepo complaints;
-    private final SosNotificationRepo sosNotifications;
     private final StorageService storageService;
 
     public VolunteerService(
             UserRepo users,
             VolunteerApplicationRepo applications,
             VolunteerApplicationPhotoRepo applicationPhotos,
-            VolunteerUserStateRepo states,
             HelpRequestRepo requests,
-            VolunteerComplaintRepo complaints,
-            SosNotificationRepo sosNotifications,
             StorageService storageService
     ) {
         this.users = users;
         this.applications = applications;
         this.applicationPhotos = applicationPhotos;
-        this.states = states;
         this.requests = requests;
-        this.complaints = complaints;
-        this.sosNotifications = sosNotifications;
         this.storageService = storageService;
     }
 
-    public record VolunteerMenuResp(boolean volunteer, String applicationStatus, String rejectReason, Instant volunteerBannedUntil) {}
+    public record VolunteerMenuResp(boolean volunteer, String applicationStatus, String rejectReason) {}
     public record CreateVolunteerApplicationReq(String dobroUrl, String phone, String socialNickname, List<String> certificatePhotoUrls) {}
     public record PhotoUploadResp(String photoUrl) {}
     public record VolunteerApplicationResp(String id, String applicantId, String applicantName, String dobroUrl, String phone, String socialNickname, List<String> certificatePhotoUrls, String status, String moderatorComment, Instant createdAt, Instant moderatedAt) {}
     public record RejectApplicationReq(String reason) {}
     public record HelpRequestReq(String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment) {}
     public record HelpRequestResp(String id, String requesterId, String volunteerId, String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment, String status, boolean contactsVisible, boolean canStart, boolean started, boolean completed, Instant createdAt) {}
-    public record SosReq(String comment) {}
-    public record LocationReq(Double latitude, Double longitude) {}
     public record RoutePointReq(Double latitude, Double longitude) {}
     public record WalkRouteReq(
             @JsonProperty("points") @JsonAlias("encodedPoints") String encodedPoints,
             @JsonProperty("routePoints") List<RoutePointReq> routePoints
     ) {}
-    public record ComplaintReq(String text) {}
-    public record ComplaintResp(String id, String requestId, String authorId, String targetId, String text, String status, String moderatorComment, Instant createdAt, Instant resolvedAt) {}
-    public record ResolveComplaintReq(String guiltyUserId, String moderatorComment) {}
-    public record SosResp(String id, String requestId, String reason, String comment, String status, String moderatorComment, String requesterName, String volunteerName, String requesterPhone, String volunteerPhone, String requesterSocial, String volunteerSocial, Instant createdAt, Instant resolvedAt) {}
-    public record ResolveSosReq(String moderatorComment) {}
 
     @Transactional(readOnly = true)
     public VolunteerMenuResp getMenu(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
-        VolunteerUserStateEntity state = states.findById(user.getId()).orElse(null);
         VolunteerApplicationEntity last = applications.findFirstByApplicantIdOrderByCreatedAtDesc(user.getId()).orElse(null);
         return new VolunteerMenuResp(
                 isVolunteer(user),
                 last == null ? null : last.getStatus(),
-                last == null ? null : last.getModeratorComment(),
-                state == null ? null : state.getVolunteerBannedUntil()
+                last == null ? null : last.getModeratorComment()
         );
     }
 
@@ -149,7 +129,6 @@ public class VolunteerService {
         app.getApplicant().setRole(Role.VOLUNTEER.name());
         users.save(app.getApplicant());
         applications.save(app);
-        getOrCreateState(app.getApplicant());
         return toApplicationResp(app);
     }
 
@@ -202,7 +181,6 @@ public class VolunteerService {
     @Transactional(readOnly = true)
     public List<HelpRequestResp> listAvailableRequests(String phoneFromAuth, Double latitude, Double longitude) {
         UserEntity volunteer = requireVolunteer(phoneFromAuth);
-        requireNotBanned(volunteer);
         return requests.findByStatusOrderByDateAscTimeAscCreatedAtAsc("OPEN").stream()
                 .filter(request -> !request.getRequester().getId().equals(volunteer.getId()))
                 .sorted(Comparator.comparing(HelpRequestEntity::getDate).thenComparing(HelpRequestEntity::getTime))
@@ -249,7 +227,6 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp acceptRequest(String phoneFromAuth, String id) {
         UserEntity volunteer = requireVolunteer(phoneFromAuth);
-        requireNotBanned(volunteer);
         HelpRequestEntity request = findRequest(id);
         if (!"OPEN".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_OPEN", "Help request is not open");
@@ -271,7 +248,6 @@ public class VolunteerService {
         if (!"ACCEPTED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_CANNOT_WITHDRAW", "Response cannot be withdrawn");
         }
-        subtractPoints(volunteer, VOLUNTEER_CANCEL_PENALTY);
         request.setVolunteer(null);
         request.setAcceptedAt(null);
         request.setStatus("OPEN");
@@ -291,9 +267,15 @@ public class VolunteerService {
         }
         Instant now = Instant.now();
         if (request.getRequester().getId().equals(user.getId())) {
-            request.setRequesterStartedAt(now);
+            if (request.getRequesterStartedAt() == null) {
+                requireNoActiveRequesterWalk(user, request);
+                request.setRequesterStartedAt(now);
+            }
         } else {
-            request.setVolunteerStartedAt(now);
+            if (request.getVolunteerStartedAt() == null) {
+                requireNoActiveVolunteerWalk(user, request);
+                request.setVolunteerStartedAt(now);
+            }
         }
         if (request.getRequesterStartedAt() != null && request.getVolunteerStartedAt() != null && request.getStartedAt() == null) {
             request.setStartedAt(now);
@@ -314,39 +296,6 @@ public class VolunteerService {
     }
 
     @Transactional
-    public HelpRequestResp updateLocation(String phoneFromAuth, String id, LocationReq req) {
-        UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
-        requireParticipant(request, user);
-        if (request.getStartedAt() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "WALK_NOT_STARTED", "Walk is not started");
-        }
-        if (req == null) {
-            throw bad("LOCATION_INVALID", "Location is invalid");
-        }
-        validateCoordinates(req.latitude(), req.longitude());
-        if (request.getRequester().getId().equals(user.getId())) {
-            request.setRequesterLatitude(req.latitude());
-            request.setRequesterLongitude(req.longitude());
-        } else {
-            request.setVolunteerLatitude(req.latitude());
-            request.setVolunteerLongitude(req.longitude());
-        }
-        if (isFarFromPlannedRoute(request, req.latitude(), req.longitude())) {
-            createSos(request, user, "ROUTE_DEVIATION", "Participant is more than one kilometer away from the planned route");
-        }
-        return toHelpResp(requests.save(request), user, true);
-    }
-
-    @Transactional
-    public SosResp sendSos(String phoneFromAuth, String id, SosReq req) {
-        UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
-        requireParticipant(request, user);
-        return createSos(request, user, "MANUAL", req == null ? null : req.comment());
-    }
-
-    @Transactional
     public HelpRequestResp finishWalk(String phoneFromAuth, String id) {
         UserEntity user = findCurrent(phoneFromAuth);
         HelpRequestEntity request = findRequest(id);
@@ -355,9 +304,6 @@ public class VolunteerService {
             throw new ApiException(HttpStatus.CONFLICT, "WALK_NOT_STARTED", "Walk is not started");
         }
         Instant now = Instant.now();
-        if (Duration.between(request.getStartedAt(), now).toHours() >= 5) {
-            createSos(request, user, "TIME_LIMIT", "Walk lasts more than five hours");
-        }
         if (request.getRequester().getId().equals(user.getId())) {
             request.setRequesterFinishedAt(now);
         } else {
@@ -373,112 +319,37 @@ public class VolunteerService {
         return toHelpResp(requests.save(request), user, true);
     }
 
-    @Transactional
-    public ComplaintResp createComplaint(String phoneFromAuth, String requestId, ComplaintReq req) {
-        UserEntity author = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(requestId);
-        requireParticipant(request, author);
-        String text = InputRules.trimToNull(req == null ? null : req.text());
-        if (text == null) {
-            throw bad("COMPLAINT_TEXT_EMPTY", "Complaint text is empty");
+    private void requireNoActiveRequesterWalk(UserEntity requester, HelpRequestEntity current) {
+        boolean hasActive = requests.findByRequesterIdAndStatus(requester.getId(), "ACCEPTED").stream()
+                .anyMatch(request -> isOtherActiveRequesterWalk(request, current));
+        if (hasActive) {
+            throw new ApiException(HttpStatus.CONFLICT, "ACTIVE_WALK_EXISTS", "Requester already has an active volunteer walk");
         }
-        if (request.getVolunteer() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "REQUEST_HAS_NO_VOLUNTEER", "Complaint is available after a volunteer accepts the request");
+    }
+
+    private void requireNoActiveVolunteerWalk(UserEntity volunteer, HelpRequestEntity current) {
+        boolean hasActive = requests.findByVolunteerIdAndStatus(volunteer.getId(), "ACCEPTED").stream()
+                .anyMatch(request -> isOtherActiveVolunteerWalk(request, current));
+        if (hasActive) {
+            throw new ApiException(HttpStatus.CONFLICT, "ACTIVE_WALK_EXISTS", "Volunteer already has an active volunteer walk");
         }
-        VolunteerComplaintEntity complaint = new VolunteerComplaintEntity();
-        complaint.setRequest(request);
-        complaint.setAuthor(author);
-        complaint.setTarget(request.getRequester().getId().equals(author.getId()) ? request.getVolunteer() : request.getRequester());
-        complaint.setText(text);
-        return toComplaintResp(complaints.save(complaint));
     }
 
-    @Transactional(readOnly = true)
-    public List<ComplaintResp> listPendingComplaints() {
-        return complaints.findByStatusOrderByCreatedAtAsc("PENDING").stream().map(this::toComplaintResp).toList();
+    private boolean isOtherActiveRequesterWalk(HelpRequestEntity request, HelpRequestEntity current) {
+        return !request.getId().equals(current.getId())
+                && request.getStartedAt() != null
+                && request.getRequesterFinishedAt() == null;
     }
 
-    @Transactional
-    public ComplaintResp resolveComplaint(String moderatorPhone, String id, ResolveComplaintReq req) {
-        UserEntity moderator = requireModerator(moderatorPhone);
-        VolunteerComplaintEntity complaint = complaints.findById(parseId(id, "COMPLAINT_ID_INVALID", "Complaint id is invalid"))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "COMPLAINT_NOT_FOUND", "Complaint not found"));
-        UserEntity guilty = users.findById(parseId(req == null ? null : req.guiltyUserId(), "GUILTY_USER_ID_INVALID", "Guilty user id is invalid"))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "GUILTY_USER_NOT_FOUND", "Guilty user not found"));
-        applyPenalty(complaint.getRequest(), guilty);
-        complaint.setStatus("RESOLVED");
-        complaint.setGuiltyUser(guilty);
-        complaint.setModerator(moderator);
-        complaint.setModeratorComment(InputRules.trimToNull(req.moderatorComment()));
-        complaint.setResolvedAt(Instant.now());
-        return toComplaintResp(complaints.save(complaint));
-    }
-
-    @Transactional(readOnly = true)
-    public List<SosResp> listSosNotifications() {
-        return sosNotifications.findByStatusInOrderByCreatedAtDesc(List.of("OPEN", "CONFIRMED")).stream().map(this::toSosResp).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<SosResp> listAllSosNotifications() {
-        return sosNotifications.findAllByOrderByCreatedAtDesc().stream().map(this::toSosResp).toList();
-    }
-
-    @Transactional
-    public SosResp confirmSos(String moderatorPhone, String id, ResolveSosReq req) {
-        return updateSosStatus(moderatorPhone, id, "CONFIRMED", req);
-    }
-
-    @Transactional
-    public SosResp markSosFalseAlarm(String moderatorPhone, String id, ResolveSosReq req) {
-        return updateSosStatus(moderatorPhone, id, "FALSE_ALARM", req);
-    }
-
-    @Transactional
-    public SosResp resolveSos(String moderatorPhone, String id, ResolveSosReq req) {
-        return updateSosStatus(moderatorPhone, id, "RESOLVED", req);
-    }
-
-    private SosResp updateSosStatus(String moderatorPhone, String id, String status, ResolveSosReq req) {
-        UserEntity moderator = requireModerator(moderatorPhone);
-        SosNotificationEntity sos = sosNotifications.findById(parseId(id, "SOS_ID_INVALID", "SOS id is invalid"))
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "SOS_NOT_FOUND", "SOS notification not found"));
-        if ("RESOLVED".equals(sos.getStatus()) || "FALSE_ALARM".equals(sos.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "SOS_ALREADY_CLOSED", "SOS notification is already closed");
-        }
-        if ("FALSE_ALARM".equals(status) && "CONFIRMED".equals(sos.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "SOS_ALREADY_CONFIRMED", "Confirmed SOS cannot be marked as false alarm");
-        }
-        sos.setStatus(status);
-        sos.setModerator(moderator);
-        sos.setModeratorComment(InputRules.trimToNull(req == null ? null : req.moderatorComment()));
-        if ("RESOLVED".equals(status) || "FALSE_ALARM".equals(status)) {
-            sos.setResolvedAt(Instant.now());
-        }
-        return toSosResp(sosNotifications.save(sos));
-    }
-
-    private void fillRequest(HelpRequestEntity request, HelpRequestReq req) {
-        request.setFromAddress(InputRules.requireAddressText(req.fromAddress(), "FROM_ADDRESS_INVALID", "From address"));
-        request.setToAddress(InputRules.requireAddressText(req.toAddress(), "TO_ADDRESS_INVALID", "To address"));
-        request.setDate(parseDate(req.date()));
-        request.setTime(parseTime(req.time()));
-        String phone = Crypto.normPhone(req.phone());
-        if (phone.isEmpty()) {
-            throw bad("PHONE_INVALID", "Phone is invalid");
-        }
-        request.setPhone(phone);
-        request.setSocialNickname(InputRules.trimToNull(req.socialNickname()));
-        String comment = InputRules.trimToNull(req.comment());
-        if (comment == null) {
-            throw bad("HELP_COMMENT_EMPTY", "Help comment is empty");
-        }
-        request.setComment(comment);
+    private boolean isOtherActiveVolunteerWalk(HelpRequestEntity request, HelpRequestEntity current) {
+        return !request.getId().equals(current.getId())
+                && request.getStartedAt() != null
+                && request.getVolunteerFinishedAt() == null;
     }
 
     private VolunteerApplicationResp toApplicationResp(VolunteerApplicationEntity app) {
         return new VolunteerApplicationResp(
-                app.getId().toString(),
+                app.getId() == null ? null : app.getId().toString(),
                 app.getApplicant().getId().toString(),
                 joinName(app.getApplicant()),
                 app.getDobroUrl(),
@@ -492,17 +363,21 @@ public class VolunteerService {
         );
     }
 
-    private HelpRequestResp toHelpResp(HelpRequestEntity request, UserEntity viewer, boolean allowOwnContacts) {
-        boolean participant = isParticipant(request, viewer);
-        boolean contactsVisible = allowOwnContacts && participant && request.getVolunteer() != null;
-        boolean canStart = participant && "ACCEPTED".equals(request.getStatus()) && scheduledTime(request).minus(30, ChronoUnit.MINUTES).isBefore(Instant.now());
+    private HelpRequestResp toHelpResp(HelpRequestEntity request, UserEntity viewer, boolean details) {
+        boolean requester = request.getRequester().getId().equals(viewer.getId());
+        boolean assignedVolunteer = request.getVolunteer() != null && request.getVolunteer().getId().equals(viewer.getId());
+        boolean contactsVisible = requester || assignedVolunteer;
+        boolean participant = requester || assignedVolunteer;
+        boolean canStart = participant
+                && "ACCEPTED".equals(request.getStatus())
+                && scheduledTime(request).minus(Duration.ofMinutes(30)).isBefore(Instant.now());
         return new HelpRequestResp(
-                request.getId().toString(),
+                request.getId() == null ? null : request.getId().toString(),
                 request.getRequester().getId().toString(),
                 request.getVolunteer() == null ? null : request.getVolunteer().getId().toString(),
                 request.getFromAddress(),
                 request.getToAddress(),
-                request.getDate().format(DATE_FORMAT),
+                DATE_FORMAT.format(request.getDate()),
                 request.getTime().toString(),
                 contactsVisible ? request.getPhone() : null,
                 contactsVisible ? request.getSocialNickname() : null,
@@ -511,30 +386,41 @@ public class VolunteerService {
                 contactsVisible,
                 canStart,
                 request.getStartedAt() != null,
-                request.getCompletedAt() != null,
+                "COMPLETED".equals(request.getStatus()),
                 request.getCreatedAt()
         );
     }
 
-    private ComplaintResp toComplaintResp(VolunteerComplaintEntity complaint) {
-        return new ComplaintResp(
-                complaint.getId().toString(),
-                complaint.getRequest().getId().toString(),
-                complaint.getAuthor().getId().toString(),
-                complaint.getTarget().getId().toString(),
-                complaint.getText(),
-                complaint.getStatus(),
-                complaint.getModeratorComment(),
-                complaint.getCreatedAt(),
-                complaint.getResolvedAt()
-        );
+    private void fillRequest(HelpRequestEntity request, HelpRequestReq req) {
+        String fromAddress = InputRules.trimToNull(req.fromAddress());
+        String toAddress = InputRules.trimToNull(req.toAddress());
+        String comment = InputRules.trimToNull(req.comment());
+        if (fromAddress == null) {
+            throw bad("FROM_ADDRESS_EMPTY", "From address is empty");
+        }
+        if (toAddress == null) {
+            throw bad("TO_ADDRESS_EMPTY", "To address is empty");
+        }
+        if (comment == null) {
+            throw bad("COMMENT_EMPTY", "Comment is empty");
+        }
+        String phone = Crypto.normPhone(req.phone());
+        if (phone.isEmpty()) {
+            throw bad("PHONE_INVALID", "Phone is invalid");
+        }
+        request.setFromAddress(fromAddress);
+        request.setToAddress(toAddress);
+        request.setDate(parseDate(req.date()));
+        request.setTime(parseTime(req.time()));
+        request.setPhone(phone);
+        request.setSocialNickname(InputRules.trimToNull(req.socialNickname()));
+        request.setComment(comment);
     }
 
-
     private void saveWalkRoute(HelpRequestEntity request, WalkRouteReq req) {
-        List<RoutePointReq> points = extractRoutePoints(req);
+        List<RoutePointReq> points = readRoutePoints(req);
         if (points.size() < 2) {
-            throw bad("ROUTE_POINTS_INVALID", "Route must contain at least two valid points");
+            throw bad("ROUTE_POINTS_INVALID", "Route must contain at least two points");
         }
         StringJoiner joiner = new StringJoiner(";");
         for (RoutePointReq point : points) {
@@ -544,36 +430,33 @@ public class VolunteerService {
         request.setPlannedRoutePoints(joiner.toString());
     }
 
-    private List<RoutePointReq> extractRoutePoints(WalkRouteReq req) {
+    private List<RoutePointReq> readRoutePoints(WalkRouteReq req) {
         if (req == null) {
-            throw bad("ROUTE_EMPTY", "Route is empty");
+            throw bad("ROUTE_POINTS_INVALID", "Route is empty");
         }
         if (req.routePoints() != null && !req.routePoints().isEmpty()) {
             return req.routePoints();
         }
         String encoded = InputRules.trimToNull(req.encodedPoints());
-        if (encoded != null) {
-            return decodePolyline(encoded);
+        if (encoded == null) {
+            throw bad("ROUTE_POINTS_INVALID", "Route is empty");
         }
-        throw bad("ROUTE_EMPTY", "Route is empty");
+        return decodePolyline(encoded);
     }
 
     private List<RoutePointReq> decodePolyline(String encoded) {
         List<RoutePointReq> points = new ArrayList<>();
         int index = 0;
         int lat = 0;
-        int lon = 0;
+        int lng = 0;
         while (index < encoded.length()) {
             int[] latResult = decodePolylineValue(encoded, index);
             lat += latResult[0];
             index = latResult[1];
-            if (index >= encoded.length()) {
-                throw bad("ROUTE_POINTS_INVALID", "Encoded route is invalid");
-            }
-            int[] lonResult = decodePolylineValue(encoded, index);
-            lon += lonResult[0];
-            index = lonResult[1];
-            points.add(new RoutePointReq(lat / 100000.0, lon / 100000.0));
+            int[] lngResult = decodePolylineValue(encoded, index);
+            lng += lngResult[0];
+            index = lngResult[1];
+            points.add(new RoutePointReq(lat / 1e5, lng / 1e5));
         }
         return points;
     }
@@ -591,69 +474,7 @@ public class VolunteerService {
             shift += 5;
         } while (b >= 0x20);
         int delta = (result & 1) != 0 ? ~(result >> 1) : result >> 1;
-        return new int[]{delta, index};
-    }
-
-    private boolean isFarFromPlannedRoute(HelpRequestEntity request, double latitude, double longitude) {
-        List<RoutePointReq> route = parseStoredRoute(request.getPlannedRoutePoints());
-        if (route.size() < 2) {
-            return false;
-        }
-        double minDistance = Double.MAX_VALUE;
-        for (int i = 1; i < route.size(); i++) {
-            RoutePointReq a = route.get(i - 1);
-            RoutePointReq b = route.get(i);
-            minDistance = Math.min(minDistance, distanceToSegmentMeters(latitude, longitude, a.latitude(), a.longitude(), b.latitude(), b.longitude()));
-        }
-        return minDistance > 1000;
-    }
-
-    private List<RoutePointReq> parseStoredRoute(String raw) {
-        String value = InputRules.trimToNull(raw);
-        if (value == null) {
-            return List.of();
-        }
-        List<RoutePointReq> points = new ArrayList<>();
-        for (String part : value.split(";")) {
-            String[] coords = part.split(",");
-            if (coords.length != 2) {
-                return List.of();
-            }
-            try {
-                points.add(new RoutePointReq(Double.parseDouble(coords[0]), Double.parseDouble(coords[1])));
-            } catch (NumberFormatException e) {
-                return List.of();
-            }
-        }
-        return points;
-    }
-
-    private double distanceToSegmentMeters(double pointLat, double pointLon, double startLat, double startLon, double endLat, double endLon) {
-        double refLat = Math.toRadians(pointLat);
-        double px = lonToMeters(pointLon, refLat);
-        double py = latToMeters(pointLat);
-        double ax = lonToMeters(startLon, refLat);
-        double ay = latToMeters(startLat);
-        double bx = lonToMeters(endLon, refLat);
-        double by = latToMeters(endLat);
-        double dx = bx - ax;
-        double dy = by - ay;
-        if (dx == 0 && dy == 0) {
-            return Math.hypot(px - ax, py - ay);
-        }
-        double t = ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy);
-        t = Math.max(0, Math.min(1, t));
-        double closestX = ax + t * dx;
-        double closestY = ay + t * dy;
-        return Math.hypot(px - closestX, py - closestY);
-    }
-
-    private double latToMeters(double lat) {
-        return Math.toRadians(lat) * 6371000.0;
-    }
-
-    private double lonToMeters(double lon, double refLat) {
-        return Math.toRadians(lon) * 6371000.0 * Math.cos(refLat);
+        return new int[] { delta, index };
     }
 
     private void validateCoordinates(Double latitude, Double longitude) {
@@ -661,99 +482,6 @@ public class VolunteerService {
                 || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
             throw bad("LOCATION_INVALID", "Location is invalid");
         }
-    }
-
-    private SosResp createSos(HelpRequestEntity request, UserEntity sender, String reason, String comment) {
-        SosNotificationEntity sos = new SosNotificationEntity();
-        sos.setRequest(request);
-        sos.setSender(sender);
-        sos.setReason(reason);
-        sos.setComment(InputRules.trimToNull(comment));
-        sos.setStatus("OPEN");
-        return toSosResp(sosNotifications.save(sos));
-    }
-
-    private SosResp toSosResp(SosNotificationEntity sos) {
-        HelpRequestEntity request = sos.getRequest();
-        return new SosResp(
-                sos.getId().toString(),
-                request.getId().toString(),
-                sos.getReason(),
-                sos.getComment(),
-                sos.getStatus(),
-                sos.getModeratorComment(),
-                joinName(request.getRequester()),
-                request.getVolunteer() == null ? null : joinName(request.getVolunteer()),
-                request.getPhone(),
-                volunteerContact(request.getVolunteer(), true),
-                request.getSocialNickname(),
-                volunteerContact(request.getVolunteer(), false),
-                sos.getCreatedAt(),
-                sos.getResolvedAt()
-        );
-    }
-
-    private String volunteerContact(UserEntity volunteer, boolean phone) {
-        if (volunteer == null) {
-            return null;
-        }
-        return applications.findFirstByApplicantIdOrderByCreatedAtDesc(volunteer.getId())
-                .filter(app -> "APPROVED".equals(app.getStatus()))
-                .map(app -> phone ? app.getPhone() : app.getSocialNickname())
-                .orElse(null);
-    }
-
-    private double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
-        double radius = 6371000.0;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * radius * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-
-    private void applyPenalty(HelpRequestEntity request, UserEntity guilty) {
-        VolunteerUserStateEntity state = getOrCreateState(guilty);
-        boolean guiltyVolunteer = request.getVolunteer() != null && request.getVolunteer().getId().equals(guilty.getId());
-        if (guiltyVolunteer) {
-            int warnings = state.getVolunteerWarnings() + 1;
-            state.setVolunteerWarnings(warnings);
-            if (warnings == 1) {
-                subtractPoints(guilty, 50);
-            } else if (warnings == 2) {
-                subtractPoints(guilty, 75);
-            } else {
-                subtractPoints(guilty, 100);
-                state.setVolunteerWarnings(0);
-                state.setVolunteerBannedUntil(Instant.now().plus(Duration.ofDays(7)));
-            }
-        } else {
-            int warnings = state.getRequesterWarnings() + 1;
-            state.setRequesterWarnings(warnings);
-            if (warnings == 1) {
-                subtractPoints(guilty, 25);
-            } else if (warnings == 2) {
-                subtractPoints(guilty, 50);
-            } else {
-                subtractPoints(guilty, 75);
-                state.setRequesterWarnings(0);
-            }
-        }
-        states.save(state);
-    }
-
-    private VolunteerUserStateEntity getOrCreateState(UserEntity user) {
-        return states.findById(user.getId()).orElseGet(() -> {
-            VolunteerUserStateEntity state = new VolunteerUserStateEntity();
-            state.setUser(user);
-            return states.save(state);
-        });
-    }
-
-    private void subtractPoints(UserEntity user, int points) {
-        user.setTotalPoints(Math.max(0, user.getTotalPoints() - points));
-        users.save(user);
     }
 
     private UserEntity findCurrent(String phoneFromAuth) {
@@ -779,13 +507,6 @@ public class VolunteerService {
             throw new ApiException(HttpStatus.FORBIDDEN, "VOLUNTEER_REQUIRED", "Volunteer rights required");
         }
         return user;
-    }
-
-    private void requireNotBanned(UserEntity volunteer) {
-        VolunteerUserStateEntity state = states.findById(volunteer.getId()).orElse(null);
-        if (state != null && state.getVolunteerBannedUntil() != null && state.getVolunteerBannedUntil().isAfter(Instant.now())) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "VOLUNTEER_BANNED", "Volunteer is temporarily banned");
-        }
     }
 
     private boolean isVolunteer(UserEntity user) {
