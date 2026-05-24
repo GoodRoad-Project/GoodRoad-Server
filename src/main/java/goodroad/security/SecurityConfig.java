@@ -35,6 +35,7 @@ public class SecurityConfig {
                         //.requestMatchers("/users/moderators/{id}").hasAnyRole("MODERATOR", "MODERATOR_ADMIN") // TODO: возможно пересмотреть права пользователей на этот ендпоинт
                         .requestMatchers("/users/moderators/**").hasRole("MODERATOR_ADMIN")
                         .requestMatchers("/reviews/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
+                        .requestMatchers("/volunteer/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .build();
