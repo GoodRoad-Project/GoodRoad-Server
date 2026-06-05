@@ -23,7 +23,6 @@ import java.util.Map;
 public class GraphHopperService {
 
     static {
-        // Отключаем проверку SSL (только для разработки!)
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         try {
             TrustManager[] trustAllCerts = new TrustManager[]{
@@ -72,7 +71,6 @@ public class GraphHopperService {
         System.out.println("locale: " + locale);
         System.out.println("customModel: " + customModel);
 
-        // Значения по умолчанию
         if (profile == null) profile = "foot";
         if (pointsEncoded == null) pointsEncoded = true;
         if (locale == null) locale = "ru";
