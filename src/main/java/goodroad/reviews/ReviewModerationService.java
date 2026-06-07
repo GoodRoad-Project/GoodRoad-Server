@@ -11,6 +11,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import goodroad.tasks.TaskService;
+import goodroad.points.PointLedgerService;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
@@ -26,6 +29,12 @@ public class ReviewModerationService {
     private final ObstacleReviewPhotoRepo photos;
     private final UserRepo users;
     private final ReviewSupportService reviewSupport;
+
+    @Autowired(required = false)
+    private TaskService taskService;
+
+    @Autowired(required = false)
+    private PointLedgerService pointLedger;
 
     public ReviewModerationService(
             ObstacleReviewRepo reviews,
@@ -138,8 +147,12 @@ public class ReviewModerationService {
         if (delta > 0 && review.getAuthorId() != null) {
             UserEntity user = users.findById(review.getAuthorId())
                     .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User with given id not found"));
-            user.setTotalPoints(safeAddPoints(user.getTotalPoints(), delta));
-            users.save(user);
+            if (pointLedger != null) {
+                pointLedger.earn(user, delta, "REVIEW_APPROVED", "Одобрен отзыв", null, "OBSTACLE_REVIEW", review.getId());
+            } else {
+                user.setTotalPoints(safeAddPoints(user.getTotalPoints(), delta));
+                users.save(user);
+            }
         }
 
         review.setStatus(STATUS_APPROVED);
@@ -152,6 +165,9 @@ public class ReviewModerationService {
         reviews.save(review);
 
         reviewSupport.recomputeFeatureAggregate(review.getFeatureId());
+        if (taskService != null && review.getAuthorId() != null) {
+            taskService.registerApprovedReview(review.getAuthorId(), review.getFeatureId(), review.getId());
+        }
     }
 
     @Transactional

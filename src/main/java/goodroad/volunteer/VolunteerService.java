@@ -12,6 +12,9 @@ import goodroad.validation.InputRules;
 import goodroad.volunteer.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import goodroad.points.PointLedgerService;
+import goodroad.tasks.TaskService;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,6 +33,12 @@ public class VolunteerService {
     private final VolunteerApplicationPhotoRepo applicationPhotos;
     private final HelpRequestRepo requests;
     private final StorageService storageService;
+
+    @Autowired(required = false)
+    private PointLedgerService pointLedger;
+
+    @Autowired(required = false)
+    private TaskService taskService;
 
     public VolunteerService(
             UserRepo users,
@@ -313,8 +322,15 @@ public class VolunteerService {
             request.setStatus("COMPLETED");
             request.setCompletedAt(now);
             UserEntity volunteer = request.getVolunteer();
-            volunteer.setTotalPoints(volunteer.getTotalPoints() + WALK_REWARD);
-            users.save(volunteer);
+            if (pointLedger != null) {
+                pointLedger.earn(volunteer, WALK_REWARD, "VOLUNTEER_WALK_COMPLETED", "Завершена волонтерская прогулка", null, "HELP_REQUEST", request.getId());
+            } else {
+                volunteer.setTotalPoints(volunteer.getTotalPoints() + WALK_REWARD);
+                users.save(volunteer);
+            }
+            if (taskService != null) {
+                taskService.registerCompletedHelp(volunteer.getId(), request.getId());
+            }
         }
         return toHelpResp(requests.save(request), user, true);
     }
