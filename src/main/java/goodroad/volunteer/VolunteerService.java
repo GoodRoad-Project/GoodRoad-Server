@@ -60,7 +60,7 @@ public class VolunteerService {
     public record VolunteerApplicationResp(String id, String applicantId, String applicantName, String dobroUrl, String phone, String socialNickname, List<String> certificatePhotoUrls, String status, String moderatorComment, Instant createdAt, Instant moderatedAt) {}
     public record RejectApplicationReq(String reason) {}
     public record HelpRequestReq(String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment) {}
-    public record HelpRequestResp(String id, String requesterId, String volunteerId, String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment, String status, boolean contactsVisible, boolean canStart, boolean started, boolean completed, Instant createdAt) {}
+    public record HelpRequestResp(String id, String requesterId, String volunteerId, String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment, String status, boolean contactsVisible, boolean completed, Instant createdAt) {}
     public record RoutePointReq(Double latitude, Double longitude) {}
     public record WalkRouteReq(
             @JsonProperty("points") @JsonAlias("encodedPoints") String encodedPoints,
@@ -264,35 +264,6 @@ public class VolunteerService {
     }
 
     @Transactional
-    public HelpRequestResp startWalk(String phoneFromAuth, String id, WalkRouteReq routeReq) {
-        UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
-        requireParticipant(request, user);
-        if (!"ACCEPTED".equals(request.getStatus())) {
-            throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_ACCEPTED", "Walk can start only for accepted request");
-        }
-        if (routeReq != null) {
-            saveWalkRoute(request, routeReq);
-        }
-        Instant now = Instant.now();
-        if (request.getRequester().getId().equals(user.getId())) {
-            if (request.getRequesterStartedAt() == null) {
-                requireNoActiveRequesterWalk(user, request);
-                request.setRequesterStartedAt(now);
-            }
-        } else {
-            if (request.getVolunteerStartedAt() == null) {
-                requireNoActiveVolunteerWalk(user, request);
-                request.setVolunteerStartedAt(now);
-            }
-        }
-        if (request.getRequesterStartedAt() != null && request.getVolunteerStartedAt() != null && request.getStartedAt() == null) {
-            request.setStartedAt(now);
-        }
-        return toHelpResp(requests.save(request), user, true);
-    }
-
-    @Transactional
     public HelpRequestResp setWalkRoute(String phoneFromAuth, String id, WalkRouteReq req) {
         UserEntity user = findCurrent(phoneFromAuth);
         HelpRequestEntity request = findRequest(id);
@@ -309,8 +280,8 @@ public class VolunteerService {
         UserEntity user = findCurrent(phoneFromAuth);
         HelpRequestEntity request = findRequest(id);
         requireParticipant(request, user);
-        if (request.getStartedAt() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "WALK_NOT_STARTED", "Walk is not started");
+        if (!"ACCEPTED".equals(request.getStatus())) {
+            throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_ACCEPTED", "Walk can be finished only for accepted request");
         }
         Instant now = Instant.now();
         if (request.getRequester().getId().equals(user.getId())) {
@@ -335,34 +306,6 @@ public class VolunteerService {
         return toHelpResp(requests.save(request), user, true);
     }
 
-    private void requireNoActiveRequesterWalk(UserEntity requester, HelpRequestEntity current) {
-        boolean hasActive = requests.findByRequesterIdAndStatus(requester.getId(), "ACCEPTED").stream()
-                .anyMatch(request -> isOtherActiveRequesterWalk(request, current));
-        if (hasActive) {
-            throw new ApiException(HttpStatus.CONFLICT, "ACTIVE_WALK_EXISTS", "Requester already has an active volunteer walk");
-        }
-    }
-
-    private void requireNoActiveVolunteerWalk(UserEntity volunteer, HelpRequestEntity current) {
-        boolean hasActive = requests.findByVolunteerIdAndStatus(volunteer.getId(), "ACCEPTED").stream()
-                .anyMatch(request -> isOtherActiveVolunteerWalk(request, current));
-        if (hasActive) {
-            throw new ApiException(HttpStatus.CONFLICT, "ACTIVE_WALK_EXISTS", "Volunteer already has an active volunteer walk");
-        }
-    }
-
-    private boolean isOtherActiveRequesterWalk(HelpRequestEntity request, HelpRequestEntity current) {
-        return !request.getId().equals(current.getId())
-                && request.getStartedAt() != null
-                && request.getRequesterFinishedAt() == null;
-    }
-
-    private boolean isOtherActiveVolunteerWalk(HelpRequestEntity request, HelpRequestEntity current) {
-        return !request.getId().equals(current.getId())
-                && request.getStartedAt() != null
-                && request.getVolunteerFinishedAt() == null;
-    }
-
     private VolunteerApplicationResp toApplicationResp(VolunteerApplicationEntity app) {
         return new VolunteerApplicationResp(
                 app.getId() == null ? null : app.getId().toString(),
@@ -383,10 +326,6 @@ public class VolunteerService {
         boolean requester = request.getRequester().getId().equals(viewer.getId());
         boolean assignedVolunteer = request.getVolunteer() != null && request.getVolunteer().getId().equals(viewer.getId());
         boolean contactsVisible = requester || assignedVolunteer;
-        boolean participant = requester || assignedVolunteer;
-        boolean canStart = participant
-                && "ACCEPTED".equals(request.getStatus())
-                && scheduledTime(request).minus(Duration.ofMinutes(30)).isBefore(Instant.now());
         return new HelpRequestResp(
                 request.getId() == null ? null : request.getId().toString(),
                 request.getRequester().getId().toString(),
@@ -400,8 +339,6 @@ public class VolunteerService {
                 request.getComment(),
                 request.getStatus(),
                 contactsVisible,
-                canStart,
-                request.getStartedAt() != null,
                 "COMPLETED".equals(request.getStatus()),
                 request.getCreatedAt()
         );
@@ -584,10 +521,6 @@ public class VolunteerService {
         } catch (DateTimeParseException e) {
             throw bad("TIME_INVALID", "Time must have HH:mm format");
         }
-    }
-
-    private Instant scheduledTime(HelpRequestEntity request) {
-        return LocalDateTime.of(request.getDate(), request.getTime()).atZone(ZoneId.systemDefault()).toInstant();
     }
 
     private String requireUrl(String raw, String code, String msg) {

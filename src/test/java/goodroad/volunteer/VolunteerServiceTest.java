@@ -183,60 +183,18 @@ class VolunteerServiceTest {
     }
 
     @Test
-    void shouldStartWalkOnlyAfterBothParticipantsConfirm() {
+    void shouldSaveWalkRouteForAcceptedRequest() {
         UserEntity requester = user(1L, "USER", "+79990000001");
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        request.setDate(LocalDate.now());
-        request.setTime(LocalTime.now().minusMinutes(10));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
         when(requests.findById(30L)).thenReturn(Optional.of(request));
-        when(requests.findByRequesterIdAndStatus(1L, "ACCEPTED")).thenReturn(List.of());
-        when(requests.findByVolunteerIdAndStatus(2L, "ACCEPTED")).thenReturn(List.of());
         when(requests.save(request)).thenReturn(request);
 
-        VolunteerService.HelpRequestResp afterRequester = service.startWalk("+79990000001", "30", routeReq());
-        VolunteerService.HelpRequestResp afterVolunteer = service.startWalk("+79990000002", "30", null);
+        VolunteerService.HelpRequestResp result = service.setWalkRoute("+79990000001", "30", routeReq());
 
-        assertFalse(afterRequester.started());
-        assertTrue(afterVolunteer.started());
-        assertNotNull(request.getStartedAt());
+        assertEquals("ACCEPTED", result.status());
         assertEquals("59.93,30.31;59.93,30.32", request.getPlannedRoutePoints());
-    }
-
-    @Test
-    void shouldBlockRequesterFromStartingNewWalkBeforeStoppingPreviousOne() {
-        UserEntity requester = user(1L, "USER", "+79990000001");
-        UserEntity oldVolunteer = user(2L, "VOLUNTEER", "+79990000002");
-        UserEntity newVolunteer = user(3L, "VOLUNTEER", "+79990000003");
-        HelpRequestEntity active = helpRequest(30L, requester, oldVolunteer, "ACCEPTED");
-        active.setStartedAt(Instant.now().minus(Duration.ofHours(1)));
-        HelpRequestEntity next = helpRequest(31L, requester, newVolunteer, "ACCEPTED");
-
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
-        when(requests.findById(31L)).thenReturn(Optional.of(next));
-        when(requests.findByRequesterIdAndStatus(1L, "ACCEPTED")).thenReturn(List.of(active, next));
-
-        ApiException ex = assertThrows(ApiException.class, () -> service.startWalk("+79990000001", "31", null));
-        assertEquals("ACTIVE_WALK_EXISTS", ex.code());
-    }
-
-    @Test
-    void shouldBlockVolunteerFromStartingNewWalkBeforeStoppingPreviousOne() {
-        UserEntity firstRequester = user(1L, "USER", "+79990000001");
-        UserEntity secondRequester = user(3L, "USER", "+79990000003");
-        UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
-        HelpRequestEntity active = helpRequest(30L, firstRequester, volunteer, "ACCEPTED");
-        active.setStartedAt(Instant.now().minus(Duration.ofHours(1)));
-        HelpRequestEntity next = helpRequest(31L, secondRequester, volunteer, "ACCEPTED");
-
-        when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(31L)).thenReturn(Optional.of(next));
-        when(requests.findByVolunteerIdAndStatus(2L, "ACCEPTED")).thenReturn(List.of(active, next));
-
-        ApiException ex = assertThrows(ApiException.class, () -> service.startWalk("+79990000002", "31", null));
-        assertEquals("ACTIVE_WALK_EXISTS", ex.code());
     }
 
     @Test
@@ -244,7 +202,6 @@ class VolunteerServiceTest {
         UserEntity requester = user(1L, "USER", "+79990000001");
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
-        request.setStartedAt(Instant.now().minus(Duration.ofMinutes(30)));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
         when(requests.findById(30L)).thenReturn(Optional.of(request));
