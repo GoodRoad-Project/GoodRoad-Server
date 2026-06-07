@@ -1,6 +1,7 @@
 package goodroad.auth;
 
 import goodroad.users.repository.UserEntity;
+import goodroad.security.JwtService;
 import goodroad.users.repository.UserRepo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,6 +24,9 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private JwtService jwtService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -41,6 +45,7 @@ class AuthServiceTest {
                     u.setId(1L);
                     return u;
                 });
+        when(jwtService.generateToken(anyString(), any(UserEntity.class))).thenReturn("token");
 
         AuthService.RegisterReq req = new AuthService.RegisterReq(
                 "Иван",
@@ -54,6 +59,8 @@ class AuthServiceTest {
         assertNotNull(resp);
         assertEquals("USER", resp.user().role());
         assertEquals("1", resp.user().id());
+        assertEquals("token", resp.accessToken());
+        assertEquals("Bearer", resp.tokenType());
 
         verify(users).save(any(UserEntity.class));
     }
@@ -97,6 +104,7 @@ class AuthServiceTest {
                     u.setId(1L);
                     return u;
                 });
+        when(jwtService.generateToken(anyString(), any(UserEntity.class))).thenReturn("token");
 
         AuthService.LoginReq req = new AuthService.LoginReq(
                 "+79990001122",
@@ -107,6 +115,8 @@ class AuthServiceTest {
 
         assertEquals("USER", resp.user().role());
         assertEquals("1", resp.user().id());
+        assertEquals("token", resp.accessToken());
+        assertEquals("Bearer", resp.tokenType());
 
         verify(users).save(user);
     }

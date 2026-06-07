@@ -3,6 +3,7 @@ package goodroad.auth;
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.Role;
 import goodroad.security.Crypto;
+import goodroad.security.JwtService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import goodroad.validation.InputRules;
@@ -23,10 +24,12 @@ public class AuthService {
 
     private final UserRepo users;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public AuthService(UserRepo users, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepo users, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
     public record RegisterReq(
@@ -58,7 +61,9 @@ public class AuthService {
     }
 
     public record AuthResp(
-            UserView user
+            UserView user,
+            String accessToken,
+            String tokenType
     ) {
     }
 
@@ -110,7 +115,7 @@ public class AuthService {
 
         UserEntity saved = users.save(user);
 
-        return toResp(saved);
+        return toResp(saved, phoneNorm);
     }
 
     @Transactional
@@ -146,7 +151,7 @@ public class AuthService {
         user.setLastActiveAt(Instant.now());
         UserEntity saved = users.save(user);
 
-        return toResp(saved);
+        return toResp(saved, phoneNorm);
     }
 
     public record ChangePassReq(
@@ -238,12 +243,14 @@ public class AuthService {
         users.save(user);
     }
 
-    private AuthResp toResp(UserEntity user) {
+    private AuthResp toResp(UserEntity user, String phoneNorm) {
         return new AuthResp(
                 new UserView(
                         String.valueOf(Objects.requireNonNull(user.getId())),
                         user.getRole()
-                )
+                ),
+                jwtService.generateToken(phoneNorm, user),
+                "Bearer"
         );
     }
 
