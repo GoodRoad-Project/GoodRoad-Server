@@ -2,6 +2,7 @@ package goodroad.points;
 
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.points.repository.*;
+import goodroad.security.Crypto;
 import goodroad.users.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,9 @@ public class PointLedgerService {
         this.transactions = transactions;
     }
 
+    public record PointsAccountView(String userId, int balance, int lifetimePoints, int completedTasksCount, String title) {}
+    public record PointsHistoryView(String userId, int balance, List<PointTransactionView> transactions) {}
+    public record LeaderboardItem(String userId, String firstName, String lastName, int lifetimePoints, String title) {}
     public record PointTransactionView(String id, String direction, int amount, String reason, String details, String taskId, String rewardOfferId, String sourceType, String sourceId, java.time.Instant createdAt) {}
 
     @Transactional
@@ -41,8 +45,34 @@ public class PointLedgerService {
     }
 
     @Transactional(readOnly = true)
+    public PointsAccountView account(String phoneFromAuth) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        return toAccountView(user);
+    }
+
+    @Transactional(readOnly = true)
+    public PointsHistoryView historyForCurrentUser(String phoneFromAuth) {
+        UserEntity user = findCurrent(phoneFromAuth);
+        return new PointsHistoryView(
+                user.getId().toString(),
+                safe(user.getTotalPoints()),
+                history(user)
+        );
+    }
+
+    @Transactional(readOnly = true)
     public List<PointTransactionView> history(UserEntity user) {
         return transactions.findByUserIdOrderByCreatedAtDesc(user.getId()).stream().map(PointLedgerService::toView).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LeaderboardItem> leaderboard() {
+        return users.findAll().stream()
+                .sorted(Comparator.comparingInt((UserEntity u) -> -Math.max(safe(u.getLifetimePoints()), safe(u.getTotalPoints()))).thenComparing(UserEntity::getId))
+                .map(user -> {
+                    int lifetime = Math.max(safe(user.getLifetimePoints()), safe(user.getTotalPoints()));
+                    return new LeaderboardItem(user.getId().toString(), user.getFirstName(), user.getLastName(), lifetime, titleFor(lifetime));
+                }).toList();
     }
 
     private void saveTx(Long userId, String direction, int amount, String reason, String details, Long taskId, Long rewardOfferId, String sourceType, Long sourceId) {
@@ -57,6 +87,30 @@ public class PointLedgerService {
         tx.setSourceType(sourceType);
         tx.setSourceId(sourceId);
         transactions.save(tx);
+    }
+
+    private UserEntity findCurrent(String phoneFromAuth) {
+        String phoneNorm = Crypto.normPhone(phoneFromAuth);
+        if (phoneNorm.isEmpty()) throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
+        return users.findByPhoneHash(Crypto.sha256Hex(phoneNorm))
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+    }
+
+    private PointsAccountView toAccountView(UserEntity user) {
+        int balance = safe(user.getTotalPoints());
+        int lifetime = Math.max(safe(user.getLifetimePoints()), balance);
+        return new PointsAccountView(user.getId().toString(), balance, lifetime, safe(user.getCompletedTasksCount()), titleFor(lifetime));
+    }
+
+    public String titleFor(int points) {
+        if (points >= 3000) return "Легенда добрых маршрутов";
+        if (points >= 2500) return "Мастер доступного города";
+        if (points >= 2000) return "Навигатор перемен";
+        if (points >= 1500) return "Хранитель маршрутов";
+        if (points >= 1000) return "Герой района";
+        if (points >= 500) return "Проводник добра";
+        if (points >= 100) return "Разведчик тротуаров";
+        return "Новичок GoodRoad";
     }
 
     private static int safe(Integer value) { return value == null ? 0 : Math.max(0, value); }
