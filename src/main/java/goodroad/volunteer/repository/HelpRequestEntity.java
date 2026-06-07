@@ -52,15 +52,6 @@ public class HelpRequestEntity {
     @Column(name = "cancelled_at")
     private Instant cancelledAt;
 
-    @Column(name = "requester_started_at")
-    private Instant requesterStartedAt;
-
-    @Column(name = "volunteer_started_at")
-    private Instant volunteerStartedAt;
-
-    @Column(name = "started_at")
-    private Instant startedAt;
-
     @Column(name = "requester_finished_at")
     private Instant requesterFinishedAt;
 
@@ -109,12 +100,6 @@ public class HelpRequestEntity {
     public void setAcceptedAt(Instant acceptedAt) { this.acceptedAt = acceptedAt; }
     public Instant getCancelledAt() { return cancelledAt; }
     public void setCancelledAt(Instant cancelledAt) { this.cancelledAt = cancelledAt; }
-    public Instant getRequesterStartedAt() { return requesterStartedAt; }
-    public void setRequesterStartedAt(Instant requesterStartedAt) { this.requesterStartedAt = requesterStartedAt; }
-    public Instant getVolunteerStartedAt() { return volunteerStartedAt; }
-    public void setVolunteerStartedAt(Instant volunteerStartedAt) { this.volunteerStartedAt = volunteerStartedAt; }
-    public Instant getStartedAt() { return startedAt; }
-    public void setStartedAt(Instant startedAt) { this.startedAt = startedAt; }
     public Instant getRequesterFinishedAt() { return requesterFinishedAt; }
     public void setRequesterFinishedAt(Instant requesterFinishedAt) { this.requesterFinishedAt = requesterFinishedAt; }
     public Instant getVolunteerFinishedAt() { return volunteerFinishedAt; }
