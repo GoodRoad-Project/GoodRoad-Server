@@ -92,8 +92,8 @@ class VolunteerControllerTest {
     void shouldUseHelpRequestEndpoints() throws Exception {
         MockMvc mvc = standaloneSetup(new VolunteerController(service)).build();
         Principal user = principal("+79990000001");
-        VolunteerService.HelpRequestResp request = helpRequest("20", null, "OPEN", false, false, false);
-        VolunteerService.HelpRequestResp accepted = helpRequest("20", "2", "ACCEPTED", true, false, false);
+        VolunteerService.HelpRequestResp request = helpRequest("20", null, "OPEN", false, false);
+        VolunteerService.HelpRequestResp accepted = helpRequest("20", "2", "ACCEPTED", true, false);
 
         when(service.createHelpRequest(eq("+79990000001"), any(VolunteerService.HelpRequestReq.class))).thenReturn(request);
         when(service.listOwnRequests("+79990000001")).thenReturn(List.of(request));
@@ -160,21 +160,13 @@ class VolunteerControllerTest {
     void shouldUseWalkEndpoints() throws Exception {
         MockMvc mvc = standaloneSetup(new VolunteerController(service)).build();
         Principal user = principal("+79990000001");
-        VolunteerService.HelpRequestResp active = helpRequest("20", "2", "ACCEPTED", true, true, false);
-        VolunteerService.HelpRequestResp completed = helpRequest("20", "2", "COMPLETED", true, true, true);
+        VolunteerService.HelpRequestResp active = helpRequest("20", "2", "ACCEPTED", true, false);
+        VolunteerService.HelpRequestResp completed = helpRequest("20", "2", "COMPLETED", true, true);
 
         when(service.setWalkRoute(eq("+79990000001"), eq("20"), any(VolunteerService.WalkRouteReq.class))).thenReturn(active);
-        when(service.startWalk(eq("+79990000001"), eq("20"), any(VolunteerService.WalkRouteReq.class))).thenReturn(active);
         when(service.finishWalk("+79990000001", "20")).thenReturn(completed);
 
         mvc.perform(post("/volunteer/requests/20/route")
-                        .principal(user)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(routeJson()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.started").value(true));
-
-        mvc.perform(post("/volunteer/requests/20/start")
                         .principal(user)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(routeJson()))
@@ -203,14 +195,13 @@ class VolunteerControllerTest {
             String volunteerId,
             String status,
             boolean contactsVisible,
-            boolean started,
             boolean completed
     ) {
         return new VolunteerService.HelpRequestResp(
                 id, "1", volunteerId, "Садовая, 10", "Невский, 20", "24-05-2026", "13:30",
                 contactsVisible ? "79990000001" : null,
                 contactsVisible ? "@user" : null,
-                "Нужно помочь дойти до метро", status, contactsVisible, true, started, completed,
+                "Нужно помочь дойти до метро", status, contactsVisible, completed,
                 Instant.parse("2026-05-01T10:00:00Z")
         );
     }
