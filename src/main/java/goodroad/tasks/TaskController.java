@@ -28,4 +28,12 @@ public class TaskController {
     public TaskService.TaskView create(@RequestBody TaskService.TaskCreateReq req) {
         return service.createTask(req);
     }
+
+    @PostMapping("/{taskId}/targets/{targetId}/complete")
+    public void completeTarget(
+            Authentication authentication,
+            @PathVariable String taskId,
+            @PathVariable String targetId) {
+        service.completeTarget(authentication.getName(), taskId, targetId);
+    }
 }
