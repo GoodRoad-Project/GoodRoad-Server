@@ -8,7 +8,7 @@ on conflict do nothing;
 
 insert into task(activity_type, title, points, target_count, status, auto_generated, center_latitude, center_longitude)
 values ('REVIEW', 'Оцените качество трех точек на карте в центре города', 30, 3, 'ACTIVE', false, 59.9343, 30.3351),
-       ('VOLUNTEER', 'Помогите трем людям с прогулкой в ближайшем районе', 130, 3, 'ACTIVE', false, 59.9343, 30.3351)
+       ('VOLUNTEER', 'Помогите трем людям с прогулкой в ближайшем районе', 120, 3, 'ACTIVE', false, 59.9343, 30.3351)
 on conflict do nothing;
 
 -- Цели заданий лучше добавлять под реальные id из вашей базы. Примеры:

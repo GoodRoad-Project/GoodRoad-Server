@@ -259,7 +259,7 @@ public class TaskService {
     }
 
     private int defaultPoints(String type, int count) {
-        if ("VOLUNTEER".equals(type)) return count == 3 ? 130 : count == 5 ? 150 : 200;
+        if ("VOLUNTEER".equals(type)) return count == 3 ? 120 : count == 5 ? 150 : 200;
         return count == 3 ? 30 : count == 5 ? 50 : 100;
     }
 

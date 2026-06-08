@@ -41,7 +41,7 @@ class PointsControllerTest {
     void shouldReturnCurrentUserPointsHistory() throws Exception {
         when(service.historyForCurrentUser("+79990000001")).thenReturn(new PointLedgerService.PointsHistoryView(
                 "10",
-                130,
+                120,
                 List.of(
                         new PointLedgerService.PointTransactionView(
                                 "2", "SPEND", 20, "REWARD_PURCHASE", "Скидка", null, "5", "REWARD_PURCHASE", "5",
@@ -59,7 +59,7 @@ class PointsControllerTest {
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value("10"))
-                .andExpect(jsonPath("$.balance").value(130))
+                .andExpect(jsonPath("$.balance").value(120))
                 .andExpect(jsonPath("$.transactions[0].id").value("2"))
                 .andExpect(jsonPath("$.transactions[0].direction").value("SPEND"))
                 .andExpect(jsonPath("$.transactions[0].amount").value(20))
