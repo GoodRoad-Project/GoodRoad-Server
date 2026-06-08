@@ -36,7 +36,7 @@ class RewardServiceTest {
 
     @Test
     void shouldRequirePurchaseConfirmation() {
-        ApiException ex = assertThrows(ApiException.class, () -> service.purchase("+79990000001", "1", new RewardService.PurchaseReq(false)));
+        ApiException ex = assertThrows(ApiException.class, () -> service.purchaseReward("+79990000001", "1", new RewardService.PurchaseReq(false)));
         assertEquals("REWARD_PURCHASE_NOT_CONFIRMED", ex.code());
     }
 
@@ -57,7 +57,7 @@ class RewardServiceTest {
             return purchase;
         });
 
-        RewardService.PurchaseResp result = service.purchase("+79990000001", "1", new RewardService.PurchaseReq(true));
+        RewardService.PurchaseResp result = service.purchaseReward("+79990000001", "1", new RewardService.PurchaseReq(true));
 
         assertEquals("100", result.id());
         verify(ledger).spend(user, 250, "REWARD_PURCHASE", "Буквоед: Скидка", 1L);
@@ -68,7 +68,7 @@ class RewardServiceTest {
         UserEntity user = user(10L, 10, 1200);
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(user));
 
-        RewardService.AccountResp account = service.account("+79990000001");
+        RewardService.AccountResp account = service.getUserPointsInfo("+79990000001");
 
         assertEquals(10, account.balance());
         assertEquals(1200, account.lifetimePoints());
