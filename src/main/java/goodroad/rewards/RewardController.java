@@ -19,22 +19,22 @@ public class RewardController {
     }
 
     @PostMapping("/{id}/purchase")
-    public RewardService.PurchaseResp purchase(Authentication authentication, @PathVariable String id, @RequestBody RewardService.PurchaseReq req) {
-        return service.purchase(authentication.getName(), id, req);
+    public RewardService.PurchaseResp purchaseReward(Authentication authentication, @PathVariable String id, @RequestBody RewardService.PurchaseReq req) {
+        return service.purchaseReward(authentication.getName(), id, req);
     }
 
     @GetMapping("/account")
-    public RewardService.AccountResp account(Authentication authentication) {
-        return service.account(authentication.getName());
+    public RewardService.AccountResp getUserPointsInfo(Authentication authentication) {
+        return service.getUserPointsInfo(authentication.getName());
     }
 
     @GetMapping("/history")
     public List<goodroad.points.PointLedgerService.PointTransactionView> history(Authentication authentication) {
-        return service.history(authentication.getName());
+        return service.getPurchaseHistory(authentication.getName());
     }
 
     @GetMapping("/leaderboard")
-    public List<RewardService.LeaderboardItem> leaderboard() {
-        return service.leaderboard();
+    public List<RewardService.LeaderboardItem> getLeaderboard() {
+        return service.getLeaderboard();
     }
 }

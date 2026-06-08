@@ -58,6 +58,7 @@ class TasksRewardsHttpApiTest {
                 new TaskService.CompletedTaskView(
                         "5",
                         "10",
+                        "Тестовое задание",
                         30,
                         Instant.parse("2026-06-01T10:00:00Z")
                 )
@@ -111,7 +112,7 @@ class TasksRewardsHttpApiTest {
                 )
         ));
 
-        when(rewardService.account("+79990000001")).thenReturn(
+        when(rewardService.getUserPointsInfo("+79990000001")).thenReturn(
                 new RewardService.AccountResp(
                         400,
                         900,
@@ -120,7 +121,7 @@ class TasksRewardsHttpApiTest {
                 )
         );
 
-        when(rewardService.purchase(eq("+79990000001"), eq("1"), any(RewardService.PurchaseReq.class)))
+        when(rewardService.purchaseReward(eq("+79990000001"), eq("1"), any(RewardService.PurchaseReq.class)))
                 .thenReturn(new RewardService.PurchaseResp(
                         "50",
                         new RewardService.RewardOfferView(
@@ -133,7 +134,7 @@ class TasksRewardsHttpApiTest {
                         300
                 ));
 
-        when(rewardService.leaderboard()).thenReturn(List.of(
+        when(rewardService.getLeaderboard()).thenReturn(List.of(
                 new RewardService.LeaderboardItem(
                         "10",
                         "Иван",

@@ -39,7 +39,7 @@ public class RewardService {
     }
 
     @Transactional
-    public PurchaseResp purchase(String phoneFromAuth, String offerId, PurchaseReq req) {
+    public PurchaseResp purchaseReward(String phoneFromAuth, String offerId, PurchaseReq req) {
         if (req == null || !req.confirmed()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "REWARD_PURCHASE_NOT_CONFIRMED", "Purchase must be confirmed");
         }
@@ -58,29 +58,29 @@ public class RewardService {
     }
 
     @Transactional(readOnly = true)
-    public AccountResp account(String phoneFromAuth) {
+    public AccountResp getUserPointsInfo(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         int balance = safe(user.getTotalPoints());
         int lifetime = Math.max(safe(user.getLifetimePoints()), balance);
-        return new AccountResp(balance, lifetime, safe(user.getCompletedTasksCount()), titleFor(lifetime));
+        return new AccountResp(balance, lifetime, safe(user.getCompletedTasksCount()), getTitleByPoints(lifetime));
     }
 
     @Transactional(readOnly = true)
-    public List<PointLedgerService.PointTransactionView> history(String phoneFromAuth) {
+    public List<PointLedgerService.PointTransactionView> getPurchaseHistory(String phoneFromAuth) {
         return ledger.history(findCurrent(phoneFromAuth));
     }
 
     @Transactional(readOnly = true)
-    public List<LeaderboardItem> leaderboard() {
+    public List<LeaderboardItem> getLeaderboard() {
         return users.findAll().stream()
                 .sorted(Comparator.comparingInt((UserEntity u) -> -Math.max(safe(u.getLifetimePoints()), safe(u.getTotalPoints()))).thenComparing(UserEntity::getId))
                 .map(user -> {
                     int lifetime = Math.max(safe(user.getLifetimePoints()), safe(user.getTotalPoints()));
-                    return new LeaderboardItem(user.getId().toString(), user.getFirstName(), user.getLastName(), lifetime, titleFor(lifetime));
+                    return new LeaderboardItem(user.getId().toString(), user.getFirstName(), user.getLastName(), lifetime, getTitleByPoints(lifetime));
                 }).toList();
     }
 
-    public String titleFor(int points) {
+    public String getTitleByPoints(int points) {
         if (points >= 3000) return "Легенда добрых маршрутов";
         if (points >= 2500) return "Мастер доступного города";
         if (points >= 2000) return "Навигатор перемен";
