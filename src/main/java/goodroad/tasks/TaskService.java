@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 public class TaskService {
     private static final double RADIUS_KM = 5.0;
     private static final Duration HELP_REQUEST_MIN_AGE = Duration.ofHours(24);
-    private static final int MAX_REVIEW_COUNT_FOR_TASK = 1;
+    private static final int MAX_REVIEW_COUNT_FOR_TASK = 50;
 
     private final UserRepo users;
     private final TaskRepo tasks;

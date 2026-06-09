@@ -170,7 +170,7 @@ class TaskServiceTest {
         when(targets.save(any(TaskTargetEntity.class))).thenAnswer(inv -> inv.getArgument(0));
         List<ObstacleFeatureEntity> lowReviewed = new ArrayList<>();
         for (long i = 1; i <= 10; i++) lowReviewed.add(feature(i, 59.93 + i * 0.0001, 30.31 + i * 0.0001, 0));
-        when(features.findLowReviewedByBbox(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(1))).thenReturn(lowReviewed);
+        when(features.findLowReviewedByBbox(anyDouble(), anyDouble(), anyDouble(), anyDouble(), eq(50))).thenReturn(lowReviewed);
         when(tasks.findByActivityTypeAndStatusOrderByCreatedAtDesc("REVIEW", "ACTIVE")).thenReturn(List.of());
 
         service.feed("+79990000001", "REVIEW", 59.93, 30.31);
