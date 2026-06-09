@@ -115,9 +115,9 @@ insert into obstacle_feature_obstacle_score(feature_id, obstacle_type, severity_
                                                                                                              (218, 'SAND', 3, 3),
                                                                                                              (219, 'CURB', 2, 4),
                                                                                                              (220, 'GRAVEL', 3, 7),
-                                                                                                             (221, 'ROAD_SLOPE', 4, 10),
+                                                                                                             (221, 'ROAD_SLOPE', 3, 10),
                                                                                                              (222, 'POTHOLES', 3, 12),
-                                                                                                             (223, 'STAIRS', 4, 15),
+                                                                                                             (223, 'STAIRS', 3, 15),
                                                                                                              (224, 'SAND', 2, 18);
 
 insert into user_obstacle_policy(user_id, obstacle_type, max_allowed_severity) values
