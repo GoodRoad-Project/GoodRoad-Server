@@ -25,6 +25,12 @@ public class HelpRequestEntity {
     @Column(name = "to_address", nullable = false, length = 500)
     private String toAddress;
 
+    @Column(name = "start_latitude")
+    private Double startLatitude;
+
+    @Column(name = "start_longitude")
+    private Double startLongitude;
+
     @Column(name = "walk_date", nullable = false)
     private LocalDate date;
 
@@ -82,6 +88,10 @@ public class HelpRequestEntity {
     public void setFromAddress(String fromAddress) { this.fromAddress = fromAddress; }
     public String getToAddress() { return toAddress; }
     public void setToAddress(String toAddress) { this.toAddress = toAddress; }
+    public Double getStartLatitude() { return startLatitude; }
+    public void setStartLatitude(Double startLatitude) { this.startLatitude = startLatitude; }
+    public Double getStartLongitude() { return startLongitude; }
+    public void setStartLongitude(Double startLongitude) { this.startLongitude = startLongitude; }
     public LocalDate getDate() { return date; }
     public void setDate(LocalDate date) { this.date = date; }
     public LocalTime getTime() { return time; }

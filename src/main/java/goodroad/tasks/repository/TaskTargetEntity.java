@@ -21,6 +21,8 @@ public class TaskTargetEntity {
     private Double longitude;
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder = 0;
+    @Column(name = "status", nullable = false, length = 16)
+    private String status = "ACTIVE";
     public Long getId(){return id;} public void setId(Long id){this.id=id;}
     public Long getTaskId(){return taskId;} public void setTaskId(Long taskId){this.taskId=taskId;}
     public String getTargetType(){return targetType;} public void setTargetType(String targetType){this.targetType=targetType;}
@@ -29,4 +31,5 @@ public class TaskTargetEntity {
     public Double getLatitude(){return latitude;} public void setLatitude(Double latitude){this.latitude=latitude;}
     public Double getLongitude(){return longitude;} public void setLongitude(Double longitude){this.longitude=longitude;}
     public Integer getSortOrder(){return sortOrder;} public void setSortOrder(Integer sortOrder){this.sortOrder=sortOrder;}
+    public String getStatus(){return status;} public void setStatus(String status){this.status=status;}
 }
