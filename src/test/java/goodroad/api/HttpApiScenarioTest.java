@@ -82,7 +82,7 @@ class HttpApiScenarioTest {
         MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
 
         when(authService.register(any(AuthService.RegisterReq.class)))
-                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER")));
+                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER"), "token", "Bearer"));
 
         mvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -96,7 +96,9 @@ class HttpApiScenarioTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value("10"))
-                .andExpect(jsonPath("$.user.role").value("USER"));
+                .andExpect(jsonPath("$.user.role").value("USER"))
+                .andExpect(jsonPath("$.accessToken").value("token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
     }
 
     @Test
@@ -104,7 +106,7 @@ class HttpApiScenarioTest {
         MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
 
         when(authService.login(any(AuthService.LoginReq.class)))
-                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER")));
+                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "USER"), "token", "Bearer"));
 
         mvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -115,7 +117,9 @@ class HttpApiScenarioTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.id").value("10"));
+                .andExpect(jsonPath("$.user.id").value("10"))
+                .andExpect(jsonPath("$.accessToken").value("token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
     }
 
     @Test

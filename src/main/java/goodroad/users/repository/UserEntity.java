@@ -38,6 +38,12 @@ public class UserEntity {
     @Column(name = "total_points", nullable = false)
     private Integer totalPoints = 0;
 
+    @Column(name = "lifetime_points", nullable = false)
+    private Integer lifetimePoints = 0;
+
+    @Column(name = "completed_tasks_count", nullable = false)
+    private Integer completedTasksCount = 0;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -57,6 +63,8 @@ public class UserEntity {
             String photoUrl,
             boolean active,
             Integer totalPoints,
+            Integer lifetimePoints,
+            Integer completedTasksCount,
             Instant createdAt,
             Instant lastActiveAt
     ) {
@@ -68,6 +76,8 @@ public class UserEntity {
         this.photoUrl = photoUrl;
         this.active = active;
         this.totalPoints = totalPoints;
+        this.lifetimePoints = lifetimePoints;
+        this.completedTasksCount = completedTasksCount;
         this.createdAt = createdAt;
         this.lastActiveAt = lastActiveAt;
     }
@@ -84,6 +94,12 @@ public class UserEntity {
         }
         if (totalPoints == null || totalPoints < 0) {
             totalPoints = 0;
+        }
+        if (lifetimePoints == null || lifetimePoints < 0) {
+            lifetimePoints = Math.max(0, totalPoints);
+        }
+        if (completedTasksCount == null || completedTasksCount < 0) {
+            completedTasksCount = 0;
         }
     }
 
@@ -157,6 +173,22 @@ public class UserEntity {
 
     public void setTotalPoints(Integer totalPoints) {
         this.totalPoints = totalPoints;
+    }
+
+    public Integer getLifetimePoints() {
+        return lifetimePoints;
+    }
+
+    public void setLifetimePoints(Integer lifetimePoints) {
+        this.lifetimePoints = lifetimePoints;
+    }
+
+    public Integer getCompletedTasksCount() {
+        return completedTasksCount;
+    }
+
+    public void setCompletedTasksCount(Integer completedTasksCount) {
+        this.completedTasksCount = completedTasksCount;
     }
 
     public Instant getCreatedAt() {

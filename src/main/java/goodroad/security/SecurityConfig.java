@@ -14,18 +14,21 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain chain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain chain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .httpBasic(Customizer.withDefaults())
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable)
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/auth/register").permitAll()
                         .requestMatchers("/auth/login").permitAll()
@@ -35,6 +38,7 @@ public class SecurityConfig {
                         //.requestMatchers("/users/moderators/{id}").hasAnyRole("MODERATOR", "MODERATOR_ADMIN") // TODO: возможно пересмотреть права пользователей на этот ендпоинт
                         .requestMatchers("/users/moderators/**").hasRole("MODERATOR_ADMIN")
                         .requestMatchers("/reviews/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
+                        .requestMatchers("/volunteer/moderation/**").hasAnyRole("MODERATOR", "MODERATOR_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .build();
