@@ -221,6 +221,8 @@ class VolunteerServiceTest {
         return new VolunteerService.HelpRequestReq(
                 "Садовая улица, 12",
                 "Невский проспект, 1",
+                59.93,
+                30.31,
                 DATE_FORMAT.format(LocalDate.now().plusDays(1)),
                 "12:30",
                 "+79990000001",
