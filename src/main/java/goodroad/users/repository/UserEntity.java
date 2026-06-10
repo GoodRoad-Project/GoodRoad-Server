@@ -50,6 +50,9 @@ public class UserEntity {
     @Column(name = "last_active_at", nullable = false)
     private Instant lastActiveAt;
 
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 1;
+
     public UserEntity() {
     }
 
@@ -66,7 +69,8 @@ public class UserEntity {
             Integer lifetimePoints,
             Integer completedTasksCount,
             Instant createdAt,
-            Instant lastActiveAt
+            Instant lastActiveAt,
+            Integer tokenVersion
     ) {
         this.firstName = firstName;
         this.lastName = lastName;
@@ -80,6 +84,7 @@ public class UserEntity {
         this.completedTasksCount = completedTasksCount;
         this.createdAt = createdAt;
         this.lastActiveAt = lastActiveAt;
+        this.tokenVersion = tokenVersion != null ? tokenVersion : 1;
     }
 
     // выполняется перед первой вставкой в таблицу в случае, если reatedAt, lastActiveAt не заданы (у модераторов такое возможно, к примеру)
@@ -205,5 +210,13 @@ public class UserEntity {
 
     public void setLastActiveAt(Instant lastActiveAt) {
         this.lastActiveAt = lastActiveAt;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 }

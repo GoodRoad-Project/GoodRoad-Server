@@ -1,8 +1,8 @@
 package goodroad.security;
 
+import goodroad.tokens.RefreshTokenService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +12,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import io.jsonwebtoken.Claims;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,10 +21,12 @@ import java.util.List;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final UserRepo users;
+    private final RefreshTokenService refreshTokenService;
 
-    public JwtAuthenticationFilter(JwtService jwtService, UserRepo users) {
+    public JwtAuthenticationFilter(JwtService jwtService, UserRepo users, RefreshTokenService refreshTokenService) {
         this.jwtService = jwtService;
         this.users = users;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @Override
@@ -40,13 +43,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String token = header.substring("Bearer ".length()).trim();
         try {
+            if (!jwtService.validateToken(token)) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             Claims claims = jwtService.parseClaims(token);
             String phoneNorm = Crypto.normPhone(claims.getSubject());
-            String role = claims.get("role", String.class);
+            Long tokenUserId = jwtService.getUserIdFromToken(token);
+            Integer tokenVersion = jwtService.getTokenVersionFromToken(token);
 
-            if (!phoneNorm.isEmpty() && role != null) {
+            if (!phoneNorm.isEmpty()) {
                 UserEntity user = users.findByPhoneHash(Crypto.sha256Hex(phoneNorm)).orElse(null);
-                if (user != null && user.isActive() && role.equals(user.getRole())) {
+
+                if (user != null && user.isActive()) {
+                    if (user.getTokenVersion() != null && tokenVersion != null && !user.getTokenVersion().equals(tokenVersion)) {
+                        refreshTokenService.revokeAllUserTokens(user.getId());
+                        response.setStatus(401);
+                        response.getWriter().write("Token version mismatch, please login again");
+                        return;
+                    }
+
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                             phoneNorm,
                             null,

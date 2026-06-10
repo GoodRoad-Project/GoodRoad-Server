@@ -1,0 +1,1 @@
+alter table users add column if not exists token_version integer default 1 not null;
