@@ -96,15 +96,6 @@ public class VolunteerController {
         return service.setWalkRoute(authentication.getName(), id, req);
     }
 
-    @PostMapping("/requests/{id}/start")
-    public VolunteerService.HelpRequestResp startWalk(
-            Authentication authentication,
-            @PathVariable String id,
-            @RequestBody(required = false) VolunteerService.WalkRouteReq req
-    ) {
-        return service.startWalk(authentication.getName(), id, req);
-    }
-
     @PostMapping("/requests/{id}/finish")
     public VolunteerService.HelpRequestResp finishWalk(Authentication authentication, @PathVariable String id) {
         return service.finishWalk(authentication.getName(), id);

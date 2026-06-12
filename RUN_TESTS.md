@@ -36,8 +36,10 @@ docker compose up --build
 ```bash
 chmod +x scripts/seed-test-data.sh
 chmod +x scripts/upload-test-photos.sh
+chmod +x ./scripts/seed-rewards-and-tasks.sh
 ./scripts/seed-test-data.sh
 ./scripts/upload-test-photos.sh
+./scripts/seed-rewards-and-tasks.sh
 ```
 
 Перед сидированием лучше пересобрать контейнер. Для загрузки фотографий необходимо установить `aws cli`, если его еще нет. 
