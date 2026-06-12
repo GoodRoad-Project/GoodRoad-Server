@@ -16,6 +16,7 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 import java.security.cert.X509Certificate;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,7 +24,7 @@ import java.util.Map;
 public class GraphHopperService {
 
     static {
-        // Отключаем проверку SSL (только для разработки!)
+        // не забыть убрать
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         try {
             TrustManager[] trustAllCerts = new TrustManager[]{
@@ -72,7 +73,6 @@ public class GraphHopperService {
         System.out.println("locale: " + locale);
         System.out.println("customModel: " + customModel);
 
-        // Значения по умолчанию
         if (profile == null) profile = "foot";
         if (pointsEncoded == null) pointsEncoded = true;
         if (locale == null) locale = "ru";
@@ -81,14 +81,17 @@ public class GraphHopperService {
             String[] startPart = start.split(",");
             String[] endPart = end.split(",");
 
-            Map<String, Object> requestBody = Map.of(
-                    "points", List.of(
-                            List.of(Double.parseDouble(startPart[1]), Double.parseDouble(startPart[0])),
-                            List.of(Double.parseDouble(endPart[1]), Double.parseDouble(endPart[0]))
-                    ),
-                    "profile", "foot",
-                    "points_encoded", true
-            );
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("points", List.of(
+                    List.of(Double.parseDouble(startPart[1]), Double.parseDouble(startPart[0])),
+                    List.of(Double.parseDouble(endPart[1]), Double.parseDouble(endPart[0]))
+            ));
+            requestBody.put("profile", profile);
+            requestBody.put("points_encoded", pointsEncoded);
+
+            if (customModel != null && !customModel.isEmpty()) {
+                requestBody.put("custom_model", customModel);
+            }
 
             RestTemplate rest = new RestTemplate();
             HttpHeaders headers = new HttpHeaders();
@@ -104,6 +107,7 @@ public class GraphHopperService {
 
         } catch (Exception e) {
             System.out.println("GraphHopper error: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
