@@ -76,6 +76,37 @@ public class StorageService {
         }
     }
 
+    public String uploadVolunteerCertificate(MultipartFile file, String userId) {
+
+        try {
+
+            String ext = getExt(file.getOriginalFilename());
+
+            String key = "volunteer-certificates/"
+                    + userId
+                    + "/"
+                    + UUID.randomUUID()
+                    + ext;
+
+            s3Client.putObject(
+                    PutObjectRequest.builder()
+                            .bucket(bucket)
+                            .key(key)
+                            .contentType(file.getContentType())
+                            .build(),
+                    RequestBody.fromBytes(file.getBytes())
+            );
+
+            return "https://storage.yandexcloud.net/"
+                    + bucket
+                    + "/"
+                    + key;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Upload failed", e);
+        }
+    }
+
     private String getExt(String name) {
         if (name == null) return "";
         int i = name.lastIndexOf(".");

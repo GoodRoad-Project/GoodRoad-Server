@@ -4,7 +4,7 @@ create table if not exists users (
     last_name      varchar(80),
     phone_hash     varchar(64) not null unique,
     role           varchar(16) not null
-    check (role in ('USER', 'MODERATOR', 'MODERATOR_ADMIN')),
+    check (role in ('USER', 'VOLUNTEER', 'MODERATOR', 'MODERATOR_ADMIN')),
     password_hash  varchar(100) not null,
     photo_url      varchar(512),
     is_active      boolean not null default true,
