@@ -38,11 +38,20 @@ public class UserEntity {
     @Column(name = "total_points", nullable = false)
     private Integer totalPoints = 0;
 
+    @Column(name = "lifetime_points", nullable = false)
+    private Integer lifetimePoints = 0;
+
+    @Column(name = "completed_tasks_count", nullable = false)
+    private Integer completedTasksCount = 0;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
     @Column(name = "last_active_at", nullable = false)
     private Instant lastActiveAt;
+
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 1;
 
     public UserEntity() {
     }
@@ -57,8 +66,11 @@ public class UserEntity {
             String photoUrl,
             boolean active,
             Integer totalPoints,
+            Integer lifetimePoints,
+            Integer completedTasksCount,
             Instant createdAt,
-            Instant lastActiveAt
+            Instant lastActiveAt,
+            Integer tokenVersion
     ) {
         this.firstName = firstName;
         this.lastName = lastName;
@@ -68,8 +80,11 @@ public class UserEntity {
         this.photoUrl = photoUrl;
         this.active = active;
         this.totalPoints = totalPoints;
+        this.lifetimePoints = lifetimePoints;
+        this.completedTasksCount = completedTasksCount;
         this.createdAt = createdAt;
         this.lastActiveAt = lastActiveAt;
+        this.tokenVersion = tokenVersion != null ? tokenVersion : 1;
     }
 
     // выполняется перед первой вставкой в таблицу в случае, если reatedAt, lastActiveAt не заданы (у модераторов такое возможно, к примеру)
@@ -84,6 +99,12 @@ public class UserEntity {
         }
         if (totalPoints == null || totalPoints < 0) {
             totalPoints = 0;
+        }
+        if (lifetimePoints == null || lifetimePoints < 0) {
+            lifetimePoints = Math.max(0, totalPoints);
+        }
+        if (completedTasksCount == null || completedTasksCount < 0) {
+            completedTasksCount = 0;
         }
     }
 
@@ -159,6 +180,22 @@ public class UserEntity {
         this.totalPoints = totalPoints;
     }
 
+    public Integer getLifetimePoints() {
+        return lifetimePoints;
+    }
+
+    public void setLifetimePoints(Integer lifetimePoints) {
+        this.lifetimePoints = lifetimePoints;
+    }
+
+    public Integer getCompletedTasksCount() {
+        return completedTasksCount;
+    }
+
+    public void setCompletedTasksCount(Integer completedTasksCount) {
+        this.completedTasksCount = completedTasksCount;
+    }
+
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -173,5 +210,13 @@ public class UserEntity {
 
     public void setLastActiveAt(Instant lastActiveAt) {
         this.lastActiveAt = lastActiveAt;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
     }
 }

@@ -1,5 +1,8 @@
 package goodroad.auth;
 
+import goodroad.security.JwtService;
+import goodroad.tokens.RefreshTokenService;
+import goodroad.users.repository.UserEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -7,20 +10,20 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService service;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthController(AuthService service) {
+    public AuthController(AuthService service, RefreshTokenService refreshTokenService) {
         this.service = service;
+        this.refreshTokenService = refreshTokenService;
     }
 
     @PostMapping("/register")
-    public AuthService.AuthResp register(
-            @RequestBody AuthService.RegisterReq req) {
+    public AuthService.AuthResp register(@RequestBody AuthService.RegisterReq req) {
         return service.register(req);
     }
 
     @PostMapping("/login")
-    public AuthService.AuthResp login(
-            @RequestBody AuthService.LoginReq req) {
+    public AuthService.AuthResp login(@RequestBody AuthService.LoginReq req) {
         return service.login(req);
     }
 
@@ -28,4 +31,37 @@ public class AuthController {
     public void recoverPassword(@RequestBody AuthService.RecoverPassReq req) {
         service.recoverPass(req.phone(), req.firstName(), req.lastName(), req.newPassword());
     }
+
+    @PostMapping("/refresh")
+    public AuthRefreshResponse refresh(@RequestBody RefreshRequest request) {
+        Long userId = refreshTokenService.validateAndGetUserId(request.getRefreshToken());
+        UserEntity user = service.getUserById(userId);
+
+        String newAccessToken = service.generateAccessToken(user);
+        String newRefreshToken = refreshTokenService.createRefreshToken(userId).getToken();
+
+        refreshTokenService.revokeToken(request.getRefreshToken());
+
+        return new AuthRefreshResponse(newAccessToken, newRefreshToken);
+    }
+}
+
+class RefreshRequest {
+    private String refreshToken;
+
+    public String getRefreshToken() { return refreshToken; }
+    public void setRefreshToken(String refreshToken) { this.refreshToken = refreshToken; }
+}
+
+class AuthRefreshResponse {
+    private String accessToken;
+    private String refreshToken;
+
+    public AuthRefreshResponse(String accessToken, String refreshToken) {
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
+    }
+
+    public String getAccessToken() { return accessToken; }
+    public String getRefreshToken() { return refreshToken; }
 }

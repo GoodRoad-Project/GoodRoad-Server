@@ -30,6 +30,8 @@ services:
       DB_PASS: ${DB_PASS}
       ADMIN_PHONE: ${ADMIN_PHONE}
       ADMIN_PASS: ${ADMIN_PASS}
+      JWT_SECRET: ${JWT_SECRET:-goodroad-dev-jwt-secret-change-me-please-32-symbols-minimum}
+      JWT_TTL_DAYS: ${JWT_TTL_DAYS:-30}
       YC_ACCESS_KEY: ${YC_ACCESS_KEY}
       YC_SECRET_KEY: ${YC_SECRET_KEY}
       YC_BUCKET: ${YC_BUCKET}

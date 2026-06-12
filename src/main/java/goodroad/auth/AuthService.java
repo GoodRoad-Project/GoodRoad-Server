@@ -3,6 +3,8 @@ package goodroad.auth;
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.Role;
 import goodroad.security.Crypto;
+import goodroad.security.JwtService;
+import goodroad.tokens.RefreshTokenService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import goodroad.validation.InputRules;
@@ -23,10 +25,14 @@ public class AuthService {
 
     private final UserRepo users;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final RefreshTokenService refreshTokenService;
 
-    public AuthService(UserRepo users, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepo users, PasswordEncoder passwordEncoder, JwtService jwtService, RefreshTokenService refreshTokenService) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public record RegisterReq(
@@ -58,7 +64,10 @@ public class AuthService {
     }
 
     public record AuthResp(
-            UserView user
+            UserView user,
+            String accessToken,
+            String refreshToken,
+            String tokenType
     ) {
     }
 
@@ -110,7 +119,7 @@ public class AuthService {
 
         UserEntity saved = users.save(user);
 
-        return toResp(saved);
+        return toResp(saved, phoneNorm);
     }
 
     @Transactional
@@ -146,7 +155,7 @@ public class AuthService {
         user.setLastActiveAt(Instant.now());
         UserEntity saved = users.save(user);
 
-        return toResp(saved);
+        return toResp(saved, phoneNorm);
     }
 
     public record ChangePassReq(
@@ -238,12 +247,18 @@ public class AuthService {
         users.save(user);
     }
 
-    private AuthResp toResp(UserEntity user) {
+    private AuthResp toResp(UserEntity user, String phoneNorm) {
+        String accessToken = jwtService.generateAccessToken(phoneNorm, user);
+        String refreshToken = refreshTokenService.createRefreshToken(user.getId()).getToken();
+
         return new AuthResp(
                 new UserView(
                         String.valueOf(Objects.requireNonNull(user.getId())),
                         user.getRole()
-                )
+                ),
+                accessToken,
+                refreshToken,
+                "Bearer"
         );
     }
 
@@ -253,5 +268,14 @@ public class AuthService {
             return null;
         }
         return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    public UserEntity getUserById(Long userId) {
+        return users.findById(userId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"));
+    }
+
+    public String generateAccessToken(UserEntity user) {
+        return jwtService.generateAccessToken(user.getPhoneHash(), user);
     }
 }
