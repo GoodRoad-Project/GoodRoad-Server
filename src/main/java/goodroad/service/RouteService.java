@@ -141,13 +141,40 @@ public class RouteService {
         return null;
     }
 
+    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> allObstacles, RouteRequest request) {
+        List<Map<String, Object>> conditions = new ArrayList<>();
+
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : allObstacles) {
+            switch (obstacle.type()) {
+                case "STAIRS":
+                    conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
+                    break;
+                case "POTHOLES":
+                    conditions.add(Map.of("if", "surface == POTHOLES", "multiply_by", "0"));
+                    break;
+                case "ROAD_SLOPE":
+                    conditions.add(Map.of("if", "max_slope > 0", "multiply_by", "0")); // любой уклон
+                    break;
+                case "SAND":
+                case "GRAVEL":
+                    conditions.add(Map.of("if", "surface == " + obstacle.type(), "multiply_by", "0"));
+                    break;
+                case "CURB":
+                    conditions.add(Map.of("if", "barrier == KERB", "multiply_by", "0"));
+                    break;
+            }
+        }
+
+        return conditions.isEmpty() ? null : Map.of("priority", conditions);
+    }
+
     public RouteResponse buildThreeRoutes(RouteRequest request) {
         List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(request.getStart(), request.getEnd());
         List<ObstacleDBService.ObstacleMapItemResp> avoidedObstacles = getAvoidedObstacles(obstacles, request);
 
         Map<String, Object> fastModel = null;
         Map<String, Object> balancedModel = buildModelWithObstacles(avoidedObstacles, request);
-        Map<String, Object> safeModel = buildModelWithObstacles(avoidedObstacles, request);
+        Map<String, Object> safeModel = buildModelWithoutObstacles(avoidedObstacles, request);
 
         CompletableFuture<GraphHopperResponse> fastFuture = CompletableFuture.supplyAsync(() ->
                 graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", fastModel)
