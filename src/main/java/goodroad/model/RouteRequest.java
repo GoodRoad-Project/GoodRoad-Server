@@ -4,10 +4,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.util.List;
 import java.util.ArrayList;
+import jakarta.validation.constraints.NotBlank;
 
 @Data
 public class RouteRequest {
+    @NotBlank(message = "start is required")
     private String start;
+    @NotBlank(message = "end is required")
     private String end;
 
     @JsonProperty("user_id")
