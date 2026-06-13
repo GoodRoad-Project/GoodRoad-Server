@@ -99,6 +99,29 @@ class JwtAuthenticationFilterTest {
         verifyNoInteractions(users);
     }
 
+
+    @Test
+    void shouldNotAuthenticateRefreshToken() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, users);
+        Claims claims = Jwts.claims()
+                .subject("+79990001122")
+                .add("tokenType", "REFRESH")
+                .build();
+
+        when(jwtService.parseClaims("refresh-token")).thenReturn(claims);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer refresh-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        AtomicReference<Authentication> authenticationAfterFilter = new AtomicReference<>();
+        FilterChain chain = (req, resp) -> authenticationAfterFilter.set(SecurityContextHolder.getContext().getAuthentication());
+
+        filter.doFilter(request, response, chain);
+
+        assertNull(authenticationAfterFilter.get());
+        verifyNoInteractions(users);
+    }
+
     @Test
     void shouldNotAuthenticateInactiveUser() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, users);
