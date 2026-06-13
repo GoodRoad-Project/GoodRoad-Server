@@ -32,6 +32,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(a -> a
                         .requestMatchers("/auth/register").permitAll()
                         .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/auth/refresh").permitAll()
                         .requestMatchers("/auth/recover-password").permitAll()
                         .requestMatchers("/users/avatar/**").permitAll()
                         .requestMatchers("/routes/**").permitAll()
