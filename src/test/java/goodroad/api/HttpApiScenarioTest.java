@@ -123,6 +123,28 @@ class HttpApiScenarioTest {
     }
 
     @Test
+    void shouldRefreshToken() throws Exception {
+        MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
+
+        when(authService.refresh(any(AuthService.RefreshReq.class)))
+                .thenReturn(new AuthService.AuthResp(new AuthService.UserView("10", "VOLUNTEER"), "new-access-token", "new-refresh-token", "Bearer"));
+
+        mvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("10"))
+                .andExpect(jsonPath("$.user.role").value("VOLUNTEER"))
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+    }
+
+    @Test
     void shouldRecoverPassword() throws Exception {
         MockMvc mvc = standaloneSetup(new AuthController(authService)).build();
 

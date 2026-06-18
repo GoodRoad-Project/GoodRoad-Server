@@ -24,6 +24,12 @@ public class AuthController {
         return service.login(req);
     }
 
+    @PostMapping("/refresh")
+    public AuthService.AuthResp refresh(
+            @RequestBody AuthService.RefreshReq req) {
+        return service.refresh(req);
+    }
+
     @PostMapping("/recover-password")
     public void recoverPassword(@RequestBody AuthService.RecoverPassReq req) {
         service.recoverPass(req.phone(), req.firstName(), req.lastName(), req.newPassword());

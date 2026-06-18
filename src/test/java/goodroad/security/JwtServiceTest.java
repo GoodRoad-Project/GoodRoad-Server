@@ -29,9 +29,35 @@ class JwtServiceTest {
         assertEquals("+79990001122", claims.getSubject());
         assertEquals(42L, ((Number) claims.get("userId")).longValue());
         assertEquals("USER", claims.get("role", String.class));
+        assertEquals("ACCESS", claims.get("tokenType", String.class));
         assertNotNull(claims.getIssuedAt());
         assertNotNull(claims.getExpiration());
         assertTrue(claims.getExpiration().after(claims.getIssuedAt()));
+    }
+
+
+    @Test
+    void shouldGenerateAndParseRefreshToken() {
+        JwtService jwtService = new JwtService(SECRET, 30, 60);
+
+        UserEntity user = UserEntity.builder()
+                .role("USER")
+                .active(true)
+                .passHash("hashed")
+                .build();
+        user.setId(42L);
+
+        String token = jwtService.generateRefreshToken("+79990001122", user);
+        Claims claims = jwtService.parseClaims(token);
+
+        assertNotNull(token);
+        assertFalse(token.isBlank());
+        assertEquals("+79990001122", claims.getSubject());
+        assertEquals(42L, ((Number) claims.get("userId")).longValue());
+        assertEquals("REFRESH", claims.get("tokenType", String.class));
+        assertNull(claims.get("role", String.class));
+        assertTrue(jwtService.isRefreshToken(claims));
+        assertFalse(jwtService.isAccessToken(claims));
     }
 
     @Test

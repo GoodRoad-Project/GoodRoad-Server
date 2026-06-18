@@ -8,6 +8,7 @@ import goodroad.obstacle.ObstacleDBService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -29,6 +30,9 @@ class RouteServiceTest {
 
     @InjectMocks
     private RouteService service;
+
+    @Captor
+    private ArgumentCaptor<Map<String, Object>> customModelCaptor;
 
     @Test
     void shouldBuildThreeRoutes() {
@@ -75,8 +79,14 @@ class RouteServiceTest {
 
         service.buildThreeRoutes(request);
 
-        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(graphHopperService, times(3)).getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), captor.capture());
-        assertNull(captor.getAllValues().get(0));
+        verify(graphHopperService, times(3)).getRoute(
+                anyString(),
+                anyString(),
+                anyString(),
+                anyBoolean(),
+                anyString(),
+                customModelCaptor.capture()
+        );
+        assertNull(customModelCaptor.getAllValues().get(0));
     }
 }

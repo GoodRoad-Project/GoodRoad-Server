@@ -59,7 +59,17 @@ public class VolunteerService {
     public record PhotoUploadResp(String photoUrl) {}
     public record VolunteerApplicationResp(String id, String applicantId, String applicantName, String dobroUrl, String phone, String socialNickname, List<String> certificatePhotoUrls, String status, String moderatorComment, Instant createdAt, Instant moderatedAt) {}
     public record RejectApplicationReq(String reason) {}
-    public record HelpRequestReq(String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment) {}
+    public record HelpRequestReq(
+            String fromAddress,
+            String toAddress,
+            Double startLatitude,
+            Double startLongitude,
+            String date,
+            String time,
+            String phone,
+            String socialNickname,
+            String comment
+    ) {}
     public record HelpRequestResp(String id, String requesterId, String volunteerId, String fromAddress, String toAddress, String date, String time, String phone, String socialNickname, String comment, String status, boolean contactsVisible, boolean completed, Instant createdAt) {}
     public record RoutePointReq(Double latitude, Double longitude) {}
     public record WalkRouteReq(
@@ -363,6 +373,11 @@ public class VolunteerService {
         }
         request.setFromAddress(fromAddress);
         request.setToAddress(toAddress);
+        if (req.startLatitude() != null || req.startLongitude() != null) {
+            validateCoordinates(req.startLatitude(), req.startLongitude());
+        }
+        request.setStartLatitude(req.startLatitude());
+        request.setStartLongitude(req.startLongitude());
         request.setDate(parseDate(req.date()));
         request.setTime(parseTime(req.time()));
         request.setPhone(phone);
