@@ -24,7 +24,6 @@ import java.util.Map;
 public class GraphHopperService {
 
     static {
-        // не забыть убрать
         HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
         try {
             TrustManager[] trustAllCerts = new TrustManager[]{

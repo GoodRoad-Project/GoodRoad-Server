@@ -1,7 +1,10 @@
 package goodroad.auth;
 
 import goodroad.users.repository.UserEntity;
+import goodroad.security.JwtService;
 import goodroad.users.repository.UserRepo;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,6 +26,9 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private JwtService jwtService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -41,6 +47,8 @@ class AuthServiceTest {
                     u.setId(1L);
                     return u;
                 });
+        when(jwtService.generateAccessToken(anyString(), any(UserEntity.class))).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(anyString(), any(UserEntity.class))).thenReturn("refresh-token");
 
         AuthService.RegisterReq req = new AuthService.RegisterReq(
                 "Иван",
@@ -54,6 +62,9 @@ class AuthServiceTest {
         assertNotNull(resp);
         assertEquals("USER", resp.user().role());
         assertEquals("1", resp.user().id());
+        assertEquals("access-token", resp.accessToken());
+        assertEquals("refresh-token", resp.refreshToken());
+        assertEquals("Bearer", resp.tokenType());
 
         verify(users).save(any(UserEntity.class));
     }
@@ -97,6 +108,8 @@ class AuthServiceTest {
                     u.setId(1L);
                     return u;
                 });
+        when(jwtService.generateAccessToken(anyString(), any(UserEntity.class))).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(anyString(), any(UserEntity.class))).thenReturn("refresh-token");
 
         AuthService.LoginReq req = new AuthService.LoginReq(
                 "+79990001122",
@@ -107,6 +120,9 @@ class AuthServiceTest {
 
         assertEquals("USER", resp.user().role());
         assertEquals("1", resp.user().id());
+        assertEquals("access-token", resp.accessToken());
+        assertEquals("refresh-token", resp.refreshToken());
+        assertEquals("Bearer", resp.tokenType());
 
         verify(users).save(user);
     }
@@ -134,6 +150,55 @@ class AuthServiceTest {
         assertThrows(RuntimeException.class,
                 () -> authService.login(req));
 
+    }
+
+
+    @Test
+    void shouldRefreshTokensAndReturnCurrentRole() {
+        Claims claims = Jwts.claims()
+                .subject("+79990001122")
+                .add("tokenType", "REFRESH")
+                .build();
+
+        UserEntity user = UserEntity.builder()
+                .passHash("hashed")
+                .active(true)
+                .role("VOLUNTEER")
+                .build();
+        user.setId(1L);
+
+        when(jwtService.parseClaims("refresh-token")).thenReturn(claims);
+        when(jwtService.isRefreshToken(claims)).thenReturn(true);
+        when(users.findByPhoneHash(anyString())).thenReturn(Optional.of(user));
+        when(users.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtService.generateAccessToken(anyString(), any(UserEntity.class))).thenReturn("new-access-token");
+        when(jwtService.generateRefreshToken(anyString(), any(UserEntity.class))).thenReturn("new-refresh-token");
+
+        AuthService.AuthResp resp = authService.refresh(new AuthService.RefreshReq("refresh-token"));
+
+        assertEquals("VOLUNTEER", resp.user().role());
+        assertEquals("1", resp.user().id());
+        assertEquals("new-access-token", resp.accessToken());
+        assertEquals("new-refresh-token", resp.refreshToken());
+        assertEquals("Bearer", resp.tokenType());
+        verify(users).save(user);
+    }
+
+    @Test
+    void shouldRejectAccessTokenAsRefreshToken() {
+        Claims claims = Jwts.claims()
+                .subject("+79990001122")
+                .add("tokenType", "ACCESS")
+                .build();
+
+        when(jwtService.parseClaims("access-token")).thenReturn(claims);
+        when(jwtService.isRefreshToken(claims)).thenReturn(false);
+
+        assertThrows(RuntimeException.class,
+                () -> authService.refresh(new AuthService.RefreshReq("access-token")));
+
+        verifyNoInteractions(passwordEncoder);
+        verify(users, never()).save(any(UserEntity.class));
     }
 
     @Test

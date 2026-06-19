@@ -32,6 +32,9 @@ app:
   admin:
     phone: ${ADMIN_PHONE}
     pass: ${ADMIN_PASS}
+  jwt:
+    secret: ${JWT_SECRET:goodroad-dev-jwt-secret-change-me-please-32-symbols-minimum}
+    ttl-days: ${JWT_TTL_DAYS:30}
 
 logging:
   level:
