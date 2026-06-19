@@ -89,4 +89,116 @@ class RouteServiceTest {
         );
         assertNull(customModelCaptor.getAllValues().get(0));
     }
+
+
+    @Test
+    void shouldReturnEmptyPathsWhenGraphHopperReturnsNull() {
+        RouteRequest request = new RouteRequest();
+        request.setStart("59.9300,30.3300");
+        request.setEnd("59.9400,30.3400");
+
+        when(obstacleDBService.listInBox(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of());
+        when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
+                .thenReturn(null);
+
+        RouteResponse result = service.buildThreeRoutes(request);
+
+        assertNotNull(result);
+        assertTrue(result.getPaths().isEmpty());
+    }
+
+    @Test
+    void shouldHandleMissingStartOrEnd() {
+        RouteRequest request = new RouteRequest();
+        request.setStart("59.9300,30.3300");
+
+        assertThrows(NullPointerException.class, () -> {
+            service.buildThreeRoutes(request);
+        });
+    }
+
+    @Test
+    void shouldPassCustomModelToGraphHopper() {
+        RouteRequest request = new RouteRequest();
+        request.setStart("59.9300,30.3300");
+        request.setEnd("59.9400,30.3400");
+
+        RouteRequest.RouteObstaclePolicy policy = new RouteRequest.RouteObstaclePolicy();
+        policy.setObstacleType("STAIRS");
+        policy.setMaxAllowedSeverity((short) 2);
+        request.setObstaclePolicies(List.of(policy));
+
+        ObstacleDBService.ObstacleMapItemResp obstacle = new ObstacleDBService.ObstacleMapItemResp(
+                "1", "STAIRS", 59.93, 30.33,
+                new ObstacleDBService.AddressResp("Россия", "Санкт-Петербург", "город", "Санкт-Петербург", "Садовая", "12", null),
+                (short) 4,
+                Map.of("STAIRS", (short) 3),
+                1,
+                java.time.Instant.now()
+        );
+
+        when(obstacleDBService.listInBox(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(obstacle));
+        when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
+                .thenReturn(new GraphHopperResponse(List.of(new Path(100.0, 1000L, "abc", true)), null));
+
+        service.buildThreeRoutes(request);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(graphHopperService, times(3)).getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), captor.capture());
+
+        Map<String, Object> fastModel = captor.getAllValues().get(0);
+        Map<String, Object> balancedModel = captor.getAllValues().get(1);
+        Map<String, Object> safeModel = captor.getAllValues().get(2);
+
+        if (fastModel != null) {
+            assertNull(fastModel.get("priority"));
+        }
+
+        assertNotNull(balancedModel);
+        assertNotNull(balancedModel.get("priority"));
+
+        assertNotNull(safeModel);
+        assertNotNull(safeModel.get("priority"));
+    }
+
+    @Test
+    void shouldNotAddObstacle_IfSeverityIsLessThanMaxAllowed() {
+        RouteRequest request = new RouteRequest();
+        request.setStart("59.9300,30.3300");
+        request.setEnd("59.9400,30.3400");
+
+        RouteRequest.RouteObstaclePolicy policy = new RouteRequest.RouteObstaclePolicy();
+        policy.setObstacleType("STAIRS");
+        policy.setMaxAllowedSeverity((short) 3);
+        request.setObstaclePolicies(List.of(policy));
+
+        ObstacleDBService.ObstacleMapItemResp obstacle = new ObstacleDBService.ObstacleMapItemResp(
+                "1", "STAIRS", 59.93, 30.33,
+                new ObstacleDBService.AddressResp("Россия", "Санкт-Петербург", "город", "Санкт-Петербург", "Садовая", "12", null),
+                (short) 4,
+                Map.of("STAIRS", (short) 2),
+                1,
+                java.time.Instant.now()
+        );
+
+        when(obstacleDBService.listInBox(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
+                .thenReturn(List.of(obstacle));
+        when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
+                .thenReturn(new GraphHopperResponse(List.of(new Path(100.0, 1000L, "abc", true)), null));
+
+        service.buildThreeRoutes(request);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(graphHopperService, times(3)).getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), captor.capture());
+
+        assertNull(captor.getAllValues().get(0));
+
+        Map<String, Object> balancedModel = captor.getAllValues().get(1);
+        if (balancedModel != null) {
+            assertNull(balancedModel.get("priority"));
+        }
+    }
 }
+

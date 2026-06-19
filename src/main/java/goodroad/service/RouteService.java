@@ -112,7 +112,70 @@ public class RouteService {
     private Map<String, Object> buildModelWithObstacles(List<ObstacleDBService.ObstacleMapItemResp> obstacles, RouteRequest request) {
         List<Map<String, Object>> conditions = new ArrayList<>();
 
+        Map<String, Short> maxAllowedMap = new HashMap<>();
+        if (request.getObstaclePolicies() != null) {
+            for (RouteRequest.RouteObstaclePolicy policy : request.getObstaclePolicies()) {
+                maxAllowedMap.put(policy.getObstacleType(), policy.getMaxAllowedSeverity());
+            }
+        }
+
         for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
+            Short maxAllowed = maxAllowedMap.get(obstacle.type());
+            switch (obstacle.type()) {
+                case "STAIRS":
+                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
+                        Short severity = obstacle.obstacleSeverityEstimates().get("STAIRS");
+                        if (severity != null && severity > maxAllowed) {
+                            conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
+                        }
+                    }
+                    break;
+                case "POTHOLES":
+                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
+                        Short severity = obstacle.obstacleSeverityEstimates().get("POTHOLES");
+                        if (severity != null && severity > maxAllowed) {
+                            conditions.add(Map.of("if", "surface == POTHOLES", "multiply_by", "0"));
+                        }
+                    }
+                    break;
+                case "ROAD_SLOPE":
+                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
+                        Short severity = obstacle.obstacleSeverityEstimates().get("ROAD_SLOPE");
+                        if (severity != null && severity > maxAllowed) {
+                            conditions.add(Map.of("if", "max_slope > 0", "multiply_by", "0"));
+                        }
+                    }
+                    break;
+                case "SAND":
+                case "GRAVEL":
+                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
+                        Short severity = obstacle.obstacleSeverityEstimates().get(obstacle.type());
+                        if (severity != null && severity > maxAllowed) {
+                            conditions.add(Map.of("if", "surface == " + obstacle.type(), "multiply_by", "0"));
+                        }
+                    }
+                    break;
+                case "CURB":
+                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
+                        Short severity = obstacle.obstacleSeverityEstimates().get("CURB");
+                        if (severity != null && severity > maxAllowed) {
+                            conditions.add(Map.of("if", "barrier == KERB", "multiply_by", "0"));
+                        }
+                    }
+                    break;
+            }
+        }
+
+        if (!conditions.isEmpty()) {
+            return Map.of("priority", conditions);
+        }
+        return null;
+    }
+
+    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> allObstacles, RouteRequest request) {
+        List<Map<String, Object>> conditions = new ArrayList<>();
+
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : allObstacles) {
             switch (obstacle.type()) {
                 case "STAIRS":
                     conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
@@ -121,9 +184,7 @@ public class RouteService {
                     conditions.add(Map.of("if", "surface == POTHOLES", "multiply_by", "0"));
                     break;
                 case "ROAD_SLOPE":
-                    if (request.getMaxSlopeAngle() != null) {
-                        conditions.add(Map.of("if", "max_slope > " + request.getMaxSlopeAngle(), "multiply_by", "0"));
-                    }
+                    conditions.add(Map.of("if", "max_slope > 0", "multiply_by", "0")); // любой уклон
                     break;
                 case "SAND":
                 case "GRAVEL":
@@ -135,10 +196,7 @@ public class RouteService {
             }
         }
 
-        if (!conditions.isEmpty()) {
-            return Map.of("priority", conditions);
-        }
-        return null;
+        return conditions.isEmpty() ? null : Map.of("priority", conditions);
     }
 
     public RouteResponse buildThreeRoutes(RouteRequest request) {
@@ -147,7 +205,7 @@ public class RouteService {
 
         Map<String, Object> fastModel = null;
         Map<String, Object> balancedModel = buildModelWithObstacles(avoidedObstacles, request);
-        Map<String, Object> safeModel = buildModelWithObstacles(avoidedObstacles, request);
+        Map<String, Object> safeModel = buildModelWithoutObstacles(avoidedObstacles, request);
 
         CompletableFuture<GraphHopperResponse> fastFuture = CompletableFuture.supplyAsync(() ->
                 graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", fastModel)
