@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import goodroad.model.RouteRequest;
 import goodroad.model.RouteResponse;
 import goodroad.service.RouteService;
+import goodroad.security.JwtAuthenticationFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -35,6 +36,9 @@ class RouteControllerTest {
 
     @MockitoBean
     private RouteService routeService;
+
+    @MockitoBean
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Test
     @WithMockUser
