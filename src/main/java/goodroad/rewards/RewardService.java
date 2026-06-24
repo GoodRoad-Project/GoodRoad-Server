@@ -1,10 +1,12 @@
 package goodroad.rewards;
 
 import goodroad.api.ApiErrors.ApiException;
+import goodroad.config.CacheConfig;
 import goodroad.points.PointLedgerService;
 import goodroad.rewards.repository.*;
 import goodroad.security.Crypto;
 import goodroad.users.repository.*;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,12 +32,16 @@ public class RewardService {
     public record AccountResp(int balance, int lifetimePoints, int completedTasksCount, String title) {}
     public record LeaderboardItem(String userId, String firstName, String lastName, int lifetimePoints, String title) {}
 
+    @Cacheable(cacheNames = CacheConfig.REWARD_OFFERS, key = "T(java.util.Objects).toString(#minPrice, '') + '|' + T(java.util.Objects).toString(#maxPrice, '') + '|' + (#sort == null ? 'price_asc' : #sort.toLowerCase())", unless = "#result == null")
     @Transactional(readOnly = true)
     public List<RewardOfferView> listOffers(Integer minPrice, Integer maxPrice, String sort) {
         boolean desc = "price_desc".equalsIgnoreCase(sort) || "desc".equalsIgnoreCase(sort);
         Comparator<RewardOfferEntity> comparator = Comparator.comparingInt(RewardOfferEntity::getPrice).thenComparing(RewardOfferEntity::getId);
         if (desc) comparator = comparator.reversed();
-        return offers.findActiveFiltered(minPrice, maxPrice).stream().sorted(comparator).map(this::toView).toList();
+        return offers.findActiveFiltered(minPrice, maxPrice).stream()
+                .sorted(comparator)
+                .map(this::toView)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     @Transactional
@@ -70,6 +76,7 @@ public class RewardService {
         return ledger.history(findCurrent(phoneFromAuth));
     }
 
+    @Cacheable(cacheNames = CacheConfig.REWARD_LEADERBOARD, key = "'all'", unless = "#result == null")
     @Transactional(readOnly = true)
     public List<LeaderboardItem> getLeaderboard() {
         return users.findAll().stream()
@@ -77,7 +84,8 @@ public class RewardService {
                 .map(user -> {
                     int lifetime = Math.max(safe(user.getLifetimePoints()), safe(user.getTotalPoints()));
                     return new LeaderboardItem(user.getId().toString(), user.getFirstName(), user.getLastName(), lifetime, getTitleByPoints(lifetime));
-                }).toList();
+                })
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     public String getTitleByPoints(int points) {

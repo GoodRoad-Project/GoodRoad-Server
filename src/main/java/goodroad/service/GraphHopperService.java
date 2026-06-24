@@ -1,8 +1,10 @@
 package goodroad.service;
 
+import goodroad.config.CacheConfig;
 import goodroad.model.gh.GraphHopperResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -56,6 +58,7 @@ public class GraphHopperService {
                 .build();
     }
 
+    @Cacheable(cacheNames = CacheConfig.GRAPH_HOPPER_ROUTES, keyGenerator = "graphHopperRouteKeyGenerator", unless = "#result == null")
     public GraphHopperResponse getRoute(
             String start,
             String end,
