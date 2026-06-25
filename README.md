@@ -52,12 +52,12 @@
 
 ### Слои серверной архитектуры
 
-| Слой | Что включает | Назначение |
-|---|---|---|
-| Controller | `AuthController`, `UserController`, `ModeratorController`, `ObstacleController`, `UserObstaclePolicyController`, `UserReviewController`, `ReviewModerationController` | Прием REST-запросов и возврат ответов |
-| Service | `AuthService`, `UserSettingsService`, `ModeratorService`, `ObstacleDBService`, `UserObstaclePolicyService`, `UserReviewService`, `ReviewModerationService`, `ReviewSupportService` | Бизнес-логика приложения |
-| Repository | Репозитории пользователей, препятствий, отзывов, фотографий и политик пользователя | Работа с данными через JPA |
-| Infrastructure | `SecurityConfig`, `Crypto`, `AdminBootstrap`, `UserCleanupJob`, `ApiErrors` | Безопасность, служебные задачи, обработка ошибок |
+| Слой | Назначение |
+|---|---|
+| Controller | Прием REST-запросов и возврат ответов |
+| Service | Бизнес-логика приложения |
+| Repository | Работа с данными через JPA |
+| Infrastructure | Безопасность, служебные задачи, обработка ошибок |
 
 ---
 
@@ -72,7 +72,7 @@
 ## Безопасность
 
 - Использование **Spring Security** для защиты приватных endpoint;
-- **HTTP Basic Auth** для доступа к защищенным маршрутам;
+- **JWT Auth** для доступа к защищенным маршрутам;
 - Разграничение прав по ролям;
 - Хеширование паролей через **BCrypt**;
 - Хранение телефона в БД в виде **SHA-256 hash**;
