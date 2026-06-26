@@ -1,5 +1,6 @@
 package goodroad.service;
 
+import goodroad.model.ObstacleResponse;
 import goodroad.model.RouteRequest;
 import goodroad.model.RouteResponse;
 import goodroad.model.PathResponse;
@@ -231,21 +232,41 @@ public class RouteService {
                 ? safeResponse.getPaths().get(0) : null;
 
         List<PathResponse> paths = new ArrayList<>();
-        if (fastPath != null) paths.add(toPathResponse(fastPath, "fast"));
-        if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced"));
-        if (safePath != null) paths.add(toPathResponse(safePath, "safe"));
+        if (fastPath != null) paths.add(toPathResponse(fastPath, "fast", request.getStart(), request.getEnd()));
+        if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced", request.getStart(), request.getEnd()));
+        if (safePath != null) paths.add(toPathResponse(safePath, "safe", request.getStart(), request.getEnd()));
 
         return new RouteResponse(UUID.randomUUID().toString(), paths, null);
     }
 
-    private PathResponse toPathResponse(Path ghPath, String routeType) {
+    private PathResponse toPathResponse(Path ghPath, String routeType, String start, String end) {
         PathResponse response = new PathResponse();
         response.setDistance(ghPath.getDistance());
         response.setTime(ghPath.getTime());
         response.setPoints(ghPath.getPoints());
         response.setPointsEncoded(true);
         response.setRouteType(routeType);
-        response.setObstacles(new ArrayList<>());
+
+        List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(start, end);
+
+        List<ObstacleResponse> obstacleResponses = new ArrayList<>();
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
+            ObstacleResponse obs = new ObstacleResponse();
+            obs.setId(obstacle.id());
+            obs.setLatitude(obstacle.latitude());
+            obs.setLongitude(obstacle.longitude());
+            obs.setType(obstacle.type());
+
+            Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
+            if (severityMap != null && severityMap.containsKey(obstacle.type())) {
+                obs.setSeverity(severityMap.get(obstacle.type()));
+            }
+
+            obstacleResponses.add(obs);
+        }
+
+        response.setObstacles(obstacleResponses);
+
         return response;
     }
 }
