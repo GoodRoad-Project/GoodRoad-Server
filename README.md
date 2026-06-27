@@ -38,8 +38,8 @@
 ---
 
 ## Архитектура сервера
-<p align="center">
-  <img src="images/scheme_backend.png" alt="Архитектура сервера" width="974">
+<p align="center">-
+  <img src="images/new_server_scheme.png" alt="Архитектура сервера" width="974">
 </p>
 
 
@@ -119,9 +119,9 @@ GoodRoad-Server/
 │       │   ├── validation/
 │       │   └── volunteer/
 │       └── resources/
+│           ├── db.migration/
 │           ├── application.yml
-│           └── db/
-│               └── migration/
+│           └── db/migration/V1__init_schema.sql
 ├── Dockerfile.server
 ├── docker-compose.yml
 ├── build.gradle
