@@ -41,29 +41,7 @@ public class RouteService {
     }
 
     private List<RouteRequest.RouteObstaclePolicy> getRouteObstaclePolicies(RouteRequest request) {
-        if (request.getObstaclePolicies() != null && !request.getObstaclePolicies().isEmpty()) {
-            return request.getObstaclePolicies();
-        }
-
-        List<RouteRequest.RouteObstaclePolicy> policies = new ArrayList<>();
-        if (request.isAvoidStairs()) {
-            policies.add(policy("STAIRS", (short) 0));
-        }
-        if (request.getMaxCurbHeight() != null) {
-            policies.add(policy("CURB", request.getMaxCurbHeight().shortValue()));
-        }
-        if (request.getMaxSlopeAngle() != null) {
-            policies.add(policy("ROAD_SLOPE", request.getMaxSlopeAngle().shortValue()));
-        }
-        if (request.isAvoidBadRoad()) {
-            policies.add(policy("POTHOLES", (short) 0));
-        }
-        if (request.getAvoidSurfaceTypes() != null) {
-            for (String surface : request.getAvoidSurfaceTypes()) {
-                policies.add(policy(surface, (short) 0));
-            }
-        }
-        return policies;
+        return request.getObstaclePolicies() != null ? request.getObstaclePolicies() : new ArrayList<>();
     }
 
     private RouteRequest.RouteObstaclePolicy policy(String obstacleType, Short maxAllowedSeverity) {
@@ -173,10 +151,10 @@ public class RouteService {
         return null;
     }
 
-    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> allObstacles, RouteRequest request) {
+    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> avoidObstacles, RouteRequest request) {
         List<Map<String, Object>> conditions = new ArrayList<>();
 
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : allObstacles) {
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : avoidObstacles) {
             switch (obstacle.type()) {
                 case "STAIRS":
                     conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
