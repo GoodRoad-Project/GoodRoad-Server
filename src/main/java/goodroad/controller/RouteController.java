@@ -26,9 +26,13 @@ public class RouteController {
 
     @PostMapping
     public ResponseEntity<RouteResponse> buildRoute(@Valid @RequestBody RouteRequest request) {
+
+        long startTime = System.nanoTime();
+
         try {
             RouteResponse response = routeService.buildThreeRoutes(request);
             return ResponseEntity.ok(response);
+
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -39,6 +43,9 @@ public class RouteController {
                     HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to build route: " + e.getMessage()
             );
+        } finally {
+            long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
+            System.out.println("POST /routes completed in " + elapsedMs + " ms");
         }
     }
 
