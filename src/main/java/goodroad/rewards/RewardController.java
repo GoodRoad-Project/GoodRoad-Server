@@ -12,10 +12,19 @@ public class RewardController {
     private final RewardService service;
 
     @GetMapping
-    public List<RewardService.RewardOfferView> list(@RequestParam(required = false) Integer minPrice,
-                                                    @RequestParam(required = false) Integer maxPrice,
-                                                    @RequestParam(required = false, defaultValue = "price_asc") String sort) {
-        return service.listOffers(minPrice, maxPrice, sort);
+    public List<RewardService.RewardOfferView> list(
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(required = false, defaultValue = "price_asc") String sort) {
+
+        long start = System.nanoTime();
+
+        try {
+            return service.listOffers(minPrice, maxPrice, sort);
+        } finally {
+            long ms = (System.nanoTime() - start) / 1_000_000;
+            System.out.println("GET /rewards took " + ms + " ms");
+        }
     }
 
     @PostMapping("/{id}/purchase")

@@ -1,9 +1,13 @@
 package goodroad.points;
 
 import goodroad.api.ApiErrors.ApiException;
+import goodroad.config.CacheConfig;
 import goodroad.points.repository.*;
 import goodroad.security.Crypto;
 import goodroad.users.repository.*;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,10 @@ public class PointLedgerService {
     public record LeaderboardItem(String userId, String firstName, String lastName, int lifetimePoints, String title) {}
     public record PointTransactionView(String id, String direction, int amount, String reason, String details, String taskId, String rewardOfferId, String sourceType, String sourceId, java.time.Instant createdAt) {}
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.POINTS_LEADERBOARD, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.REWARD_LEADERBOARD, allEntries = true)
+    })
     @Transactional
     public void earn(UserEntity user, int amount, String reason, String details, Long taskId, String sourceType, Long sourceId) {
         if (amount <= 0) return;
@@ -33,6 +41,10 @@ public class PointLedgerService {
         saveTx(user.getId(), "EARN", amount, reason, details, taskId, null, sourceType, sourceId);
     }
 
+    @Caching(evict = {
+            @CacheEvict(cacheNames = CacheConfig.POINTS_LEADERBOARD, allEntries = true),
+            @CacheEvict(cacheNames = CacheConfig.REWARD_LEADERBOARD, allEntries = true)
+    })
     @Transactional
     public void spend(UserEntity user, int amount, String reason, String details, Long rewardOfferId) {
         if (amount <= 0) throw new ApiException(HttpStatus.BAD_REQUEST, "POINT_AMOUNT_INVALID", "Point amount is invalid");
@@ -65,6 +77,7 @@ public class PointLedgerService {
         return transactions.findByUserIdOrderByCreatedAtDesc(user.getId()).stream().map(PointLedgerService::toView).toList();
     }
 
+    @Cacheable(cacheNames = CacheConfig.POINTS_LEADERBOARD, key = "'all'", unless = "#result == null")
     @Transactional(readOnly = true)
     public List<LeaderboardItem> leaderboard() {
         return users.findAll().stream()
@@ -72,7 +85,8 @@ public class PointLedgerService {
                 .map(user -> {
                     int lifetime = Math.max(safe(user.getLifetimePoints()), safe(user.getTotalPoints()));
                     return new LeaderboardItem(user.getId().toString(), user.getFirstName(), user.getLastName(), lifetime, titleFor(lifetime));
-                }).toList();
+                })
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
     }
 
     private void saveTx(Long userId, String direction, int amount, String reason, String details, Long taskId, Long rewardOfferId, String sourceType, Long sourceId) {
