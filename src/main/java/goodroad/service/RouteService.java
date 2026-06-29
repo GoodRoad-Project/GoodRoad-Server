@@ -59,6 +59,11 @@ public class RouteService {
             return false;
         }
 
+        Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
+        if (severityMap == null) {
+            return false;
+        }
+
         Short obstacleSeverity = obstacle.obstacleSeverityEstimates().get(policy.getObstacleType());
         if (obstacleSeverity == null) {
             return false;
