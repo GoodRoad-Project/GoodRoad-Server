@@ -16,7 +16,7 @@ public class PlaceService {
     }
 
     public PlaceInfoResponse getPlaceInfo(double lat, double lon) {
-        List<ObstacleDBService.ObstacleMapItemResp> obstacles = obstacleDBService.listInBox(lat - 0.01, lat + 0.01, lon - 0.01, lon + 0.01);
+        List<ObstacleDBService.ObstacleMapItemResp> obstacles = obstacleDBService.listInBox(lat - 0.0001, lat + 0.0001, lon - 0.0001, lon + 0.0001);
         ObstacleDBService.ObstacleMapItemResp place = obstacles.stream()
                 .filter(o -> o.address() != null && o.address().placeName() != null && !o.address().placeName().isEmpty())
                 .findFirst()
