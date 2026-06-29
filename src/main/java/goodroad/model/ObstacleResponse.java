@@ -19,5 +19,8 @@ public class ObstacleResponse {
     private Double longitude;
 
     private String type;
+
+    private Short severity;
+
     private ObstacleDetailsResponse details;
 }

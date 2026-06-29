@@ -1,5 +1,6 @@
 package goodroad.service;
 
+import goodroad.model.ObstacleResponse;
 import goodroad.model.RouteRequest;
 import goodroad.model.RouteResponse;
 import goodroad.model.PathResponse;
@@ -40,29 +41,7 @@ public class RouteService {
     }
 
     private List<RouteRequest.RouteObstaclePolicy> getRouteObstaclePolicies(RouteRequest request) {
-        if (request.getObstaclePolicies() != null && !request.getObstaclePolicies().isEmpty()) {
-            return request.getObstaclePolicies();
-        }
-
-        List<RouteRequest.RouteObstaclePolicy> policies = new ArrayList<>();
-        if (request.isAvoidStairs()) {
-            policies.add(policy("STAIRS", (short) 0));
-        }
-        if (request.getMaxCurbHeight() != null) {
-            policies.add(policy("CURB", request.getMaxCurbHeight().shortValue()));
-        }
-        if (request.getMaxSlopeAngle() != null) {
-            policies.add(policy("ROAD_SLOPE", request.getMaxSlopeAngle().shortValue()));
-        }
-        if (request.isAvoidBadRoad()) {
-            policies.add(policy("POTHOLES", (short) 0));
-        }
-        if (request.getAvoidSurfaceTypes() != null) {
-            for (String surface : request.getAvoidSurfaceTypes()) {
-                policies.add(policy(surface, (short) 0));
-            }
-        }
-        return policies;
+        return request.getObstaclePolicies() != null ? request.getObstaclePolicies() : new ArrayList<>();
     }
 
     private RouteRequest.RouteObstaclePolicy policy(String obstacleType, Short maxAllowedSeverity) {
@@ -77,6 +56,11 @@ public class RouteService {
             RouteRequest.RouteObstaclePolicy policy
     ) {
         if (policy.getObstacleType() == null || policy.getMaxAllowedSeverity() == null) {
+            return false;
+        }
+
+        Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
+        if (severityMap == null) {
             return false;
         }
 
@@ -172,10 +156,10 @@ public class RouteService {
         return null;
     }
 
-    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> allObstacles, RouteRequest request) {
+    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> avoidObstacles, RouteRequest request) {
         List<Map<String, Object>> conditions = new ArrayList<>();
 
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : allObstacles) {
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : avoidObstacles) {
             switch (obstacle.type()) {
                 case "STAIRS":
                     conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
@@ -231,21 +215,41 @@ public class RouteService {
                 ? safeResponse.getPaths().get(0) : null;
 
         List<PathResponse> paths = new ArrayList<>();
-        if (fastPath != null) paths.add(toPathResponse(fastPath, "fast"));
-        if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced"));
-        if (safePath != null) paths.add(toPathResponse(safePath, "safe"));
+        if (fastPath != null) paths.add(toPathResponse(fastPath, "fast", request.getStart(), request.getEnd()));
+        if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced", request.getStart(), request.getEnd()));
+        if (safePath != null) paths.add(toPathResponse(safePath, "safe", request.getStart(), request.getEnd()));
 
         return new RouteResponse(UUID.randomUUID().toString(), paths, null);
     }
 
-    private PathResponse toPathResponse(Path ghPath, String routeType) {
+    private PathResponse toPathResponse(Path ghPath, String routeType, String start, String end) {
         PathResponse response = new PathResponse();
         response.setDistance(ghPath.getDistance());
         response.setTime(ghPath.getTime());
         response.setPoints(ghPath.getPoints());
         response.setPointsEncoded(true);
         response.setRouteType(routeType);
-        response.setObstacles(new ArrayList<>());
+
+        List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(start, end);
+
+        List<ObstacleResponse> obstacleResponses = new ArrayList<>();
+        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
+            ObstacleResponse obs = new ObstacleResponse();
+            obs.setId(obstacle.id());
+            obs.setLatitude(obstacle.latitude());
+            obs.setLongitude(obstacle.longitude());
+            obs.setType(obstacle.type());
+
+            Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
+            if (severityMap != null && severityMap.containsKey(obstacle.type())) {
+                obs.setSeverity(severityMap.get(obstacle.type()));
+            }
+
+            obstacleResponses.add(obs);
+        }
+
+        response.setObstacles(obstacleResponses);
+
         return response;
     }
 }

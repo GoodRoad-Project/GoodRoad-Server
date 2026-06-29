@@ -37,6 +37,8 @@ public class PlaceService {
         response.setAddress(place.address().street() + " " + (place.address().house() != null ? place.address().house() : ""));
         response.setAverageSeverity(avgSeverity);
         response.setReviews(card.reviews());
+        response.setLatitude(lat);
+        response.setLongitude(lon);
         return response;
     }
 }

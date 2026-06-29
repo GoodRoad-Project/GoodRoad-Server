@@ -15,5 +15,7 @@ public class PlaceInfoResponse {
     private String placeName;
     private String address;
     private Double averageSeverity;
-    private List<ReviewResp> reviews;
+    private List<ObstacleDBService.ReviewResp> reviews;
+    private Double latitude;
+    private Double longitude;
 }
