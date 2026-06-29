@@ -22,7 +22,7 @@ public class UserReviewService {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_APPROVED = "APPROVED";
 
-    private static final long MAX_PHOTO_SIZE = 5 * 1024 * 1024;
+    private static final long MAX_PHOTO_SIZE = 10 * 1024 * 1024;
 
     private final UserRepo users;
     private final ObstacleReviewRepo reviews;

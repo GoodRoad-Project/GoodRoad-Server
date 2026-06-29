@@ -22,7 +22,7 @@ import java.util.Set;
 @Service
 public class UserSettingsService {
 
-    private static final long MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+    private static final long MAX_AVATAR_SIZE = 10 * 1024 * 1024;
     private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
 
     private final UserRepo users;
