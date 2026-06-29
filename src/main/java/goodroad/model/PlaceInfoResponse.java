@@ -1,6 +1,6 @@
 package goodroad.model;
 
-import goodroad.obstacle.ObstacleDBService.ReviewResp;
+import goodroad.obstacle.ObstacleDBService;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
