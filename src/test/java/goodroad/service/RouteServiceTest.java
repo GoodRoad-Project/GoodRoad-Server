@@ -252,17 +252,32 @@ class RouteServiceTest {
 
         service.buildThreeRoutes(request);
 
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(graphHopperService, times(3)).getRoute(
-                anyString(), anyString(), anyString(), anyBoolean(), anyString(), customModelCaptor.capture()
+                anyString(), anyString(), anyString(), anyBoolean(), anyString(), captor.capture()
         );
 
-        Map<String, Object> balancedModel = customModelCaptor.getAllValues().get(1);
+        List<Map<String, Object>> allModels = captor.getAllValues();
+
+        assertEquals(3, allModels.size());
+
+        assertNull(allModels.get(0));
+
+        Map<String, Object> balancedModel = allModels.get(1);
         assertNotNull(balancedModel);
         assertNotNull(balancedModel.get("priority"));
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> conditions = (List<Map<String, Object>>) balancedModel.get("priority");
         assertEquals(6, conditions.size());
+
+        Map<String, Object> safeModel = allModels.get(2);
+        assertNotNull(safeModel);
+        assertNotNull(safeModel.get("priority"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> safeConditions = (List<Map<String, Object>>) safeModel.get("priority");
+        assertEquals(6, safeConditions.size());
     }
 
     @Test
