@@ -91,11 +91,6 @@ public class GraphHopperService {
             requestBody.put("profile", profile);
             requestBody.put("points_encoded", pointsEncoded);
 
-            requestBody.put("ch.disable", true);
-
-            requestBody.put("alternatives", true);
-            requestBody.put("alternative_route.max_paths", 3);
-
             if (customModel != null && !customModel.isEmpty()) {
                 requestBody.put("custom_model", customModel);
             }
