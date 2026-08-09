@@ -139,7 +139,7 @@ public class UserReviewService {
         UserEntity user = findCurrent(phoneFromAuth);
 
         ReviewValidationService.ValidatedReviewInput input =
-                validator.validate(req);
+                validator.validate(req, user.getId());
 
         ObstacleFeatureEntity feature =
                 featureService.resolveOrCreateFeature(
@@ -217,22 +217,31 @@ public class UserReviewService {
         Long oldFeatureId = review.getFeatureId();
 
         ReviewValidationService.ValidatedReviewInput input =
-                validator.validate(req);
+                validator.validate(req, user.getId());
 
         ObstacleFeatureEntity feature =
                 featureService.resolveOrCreateFeature(input);
+
+        reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId())
+                .filter(existing -> !existing.getId().equals(review.getId()))
+                .ifPresent(existing -> {
+                    throw new ApiException(HttpStatus.CONFLICT, "REVIEW_ALREADY_EXISTS", "Review already exists");
+                });
 
         review.setFeatureId(feature.getId());
         review.setSeverity(input.rating());
         review.setText(input.comment());
         review.setStatus(STATUS_PENDING);
-        review.setAwardedPoints(0);
         review.setModeratorComment(null);
 
         reviews.save(review);
 
         mapper.saveReviewObstacles(review.getId(), input.obstacles());
         mapper.savePhotos(review.getId(), input.photoUrls());
+
+        if (STATUS_APPROVED.equals(oldStatus)) {
+            reviewSupport.recomputeFeatureAggregate(oldFeatureId);
+        }
 
         user.setLastActiveAt(Instant.now());
         users.save(user);
@@ -260,7 +269,12 @@ public class UserReviewService {
                         )
                 );
 
+        Long featureId = review.getFeatureId();
+        boolean wasApproved = STATUS_APPROVED.equals(review.getStatus());
         reviews.delete(review);
+        if (wasApproved) {
+            reviewSupport.recomputeFeatureAggregate(featureId);
+        }
 
         user.setLastActiveAt(Instant.now());
         users.save(user);
