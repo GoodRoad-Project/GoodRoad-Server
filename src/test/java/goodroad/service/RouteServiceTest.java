@@ -117,7 +117,7 @@ class RouteServiceTest {
 
 
     @Test
-    void shouldReturnEmptyPathsWhenGraphHopperReturnsNull() {
+    void shouldFailWhenGraphHopperReturnsNoPaths() {
         RouteRequest request = new RouteRequest();
         request.setStart("59.9300,30.3300");
         request.setEnd("59.9400,30.3400");
@@ -127,10 +127,11 @@ class RouteServiceTest {
         when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
                 .thenReturn(null);
 
-        RouteResponse result = service.buildThreeRoutes(request);
-
-        assertNotNull(result);
-        assertTrue(result.getPaths().isEmpty());
+        goodroad.api.ApiErrors.ApiException error = assertThrows(
+                goodroad.api.ApiErrors.ApiException.class,
+                () -> service.buildThreeRoutes(request)
+        );
+        assertEquals("ROUTE_NOT_FOUND", error.code());
     }
 
     @Test
@@ -138,9 +139,27 @@ class RouteServiceTest {
         RouteRequest request = new RouteRequest();
         request.setStart("59.9300,30.3300");
 
-        assertThrows(NullPointerException.class, () -> {
-            service.buildThreeRoutes(request);
-        });
+        goodroad.api.ApiErrors.ApiException error = assertThrows(
+                goodroad.api.ApiErrors.ApiException.class,
+                () -> service.buildThreeRoutes(request)
+        );
+        assertEquals("ROUTE_POINT_INVALID", error.code());
+    }
+
+    @Test
+    void shouldRejectInvalidObstaclePolicyBeforeCallingProviders() {
+        RouteRequest request = new RouteRequest();
+        request.setStart(START);
+        request.setEnd(END);
+        request.setObstaclePolicies(List.of(createPolicy("STAIRS", (short) 4)));
+
+        goodroad.api.ApiErrors.ApiException error = assertThrows(
+                goodroad.api.ApiErrors.ApiException.class,
+                () -> service.buildThreeRoutes(request)
+        );
+
+        assertEquals("ROUTE_POLICY_SEVERITY_INVALID", error.code());
+        verifyNoInteractions(graphHopperService, obstacleDBService);
     }
 
     @Test
@@ -443,4 +462,3 @@ class RouteServiceTest {
         assertNull(customModelCaptor.getAllValues().get(1));
     }
 }
-
