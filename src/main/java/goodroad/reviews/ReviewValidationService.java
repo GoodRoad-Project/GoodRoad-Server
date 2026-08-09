@@ -2,7 +2,9 @@ package goodroad.reviews;
 
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ObstacleType;
+import goodroad.validation.GeoUtils;
 import goodroad.validation.InputRules;
+import goodroad.validation.TrustedUrlService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -10,9 +12,15 @@ import java.util.*;
 
 @Service
 public class ReviewValidationService {
+    private final TrustedUrlService trustedUrls;
+
+    public ReviewValidationService(TrustedUrlService trustedUrls) {
+        this.trustedUrls = trustedUrls;
+    }
 
     public ValidatedReviewInput validate(
-            UserReviewService.UpsertReviewReq req
+            UserReviewService.UpsertReviewReq req,
+            Long userId
     ) {
 
         if (req == null) {
@@ -31,15 +39,7 @@ public class ReviewValidationService {
             );
         }
 
-        if (Double.isNaN(req.latitude())
-                || Double.isNaN(req.longitude())) {
-
-            throw new ApiException(
-                    HttpStatus.BAD_REQUEST,
-                    "REVIEW_COORDS_INVALID",
-                    "Coordinates are invalid"
-            );
-        }
+        GeoUtils.requireCoordinates(req.latitude(), req.longitude(), "REVIEW_COORDS_INVALID");
 
         UserReviewService.AddressReq address =
                 validateAddress(req.address());
@@ -50,13 +50,14 @@ public class ReviewValidationService {
 
         List<String> photoUrls =
                 normalizePhotoUrls(
-                        req.photoUrls()
+                        req.photoUrls(),
+                        userId
                 );
 
-        String comment =
-                blankToNull(
-                        req.comment()
-                );
+        String comment = blankToNull(req.comment());
+        if (comment != null && comment.length() > 1000) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_COMMENT_TOO_LONG", "Comment is too long");
+        }
 
         String primaryObstacleType =
                 choosePrimaryObstacleType(
@@ -90,42 +91,42 @@ public class ReviewValidationService {
         }
 
         String country =
-                InputRules.requireAddressText(
+                InputRules.requireCyrillicText(
                         raw.country(),
                         "ADDRESS_COUNTRY_INVALID",
                         "Country"
                 );
 
         String region =
-                InputRules.requireAddressText(
+                InputRules.requireCyrillicText(
                         raw.region(),
                         "ADDRESS_REGION_INVALID",
                         "Region"
                 );
 
         String localityType =
-                InputRules.requireAddressText(
+                InputRules.requireCyrillicText(
                         raw.localityType(),
                         "ADDRESS_LOCALITY_TYPE_INVALID",
                         "Locality type"
                 );
 
         String city =
-                InputRules.requireAddressText(
+                InputRules.requireCyrillicText(
                         raw.city(),
                         "ADDRESS_CITY_INVALID",
                         "City"
                 );
 
         String street =
-                InputRules.requireAddressText(
+                InputRules.requireCyrillicText(
                         raw.street(),
                         "ADDRESS_STREET_INVALID",
                         "Street"
                 );
 
         String house =
-                InputRules.requireAddressText(
+                InputRules.requireDigits(
                         raw.house(),
                         "ADDRESS_HOUSE_INVALID",
                         "House"
@@ -135,6 +136,9 @@ public class ReviewValidationService {
                 blankToNull(
                         raw.placeName()
                 );
+        if (placeName != null && placeName.length() > 180) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ADDRESS_PLACE_NAME_INVALID", "Place name is too long");
+        }
 
         return new UserReviewService.AddressReq(
                 country,
@@ -243,14 +247,17 @@ public class ReviewValidationService {
     }
 
     private List<String> normalizePhotoUrls(
-            Collection<String> rawUrls
+            Collection<String> rawUrls,
+            Long userId
     ) {
 
-        List<String> out =
-                new ArrayList<>();
+        List<String> out = new ArrayList<>();
 
         if (rawUrls == null) {
-            return out;
+            return List.of();
+        }
+        if (rawUrls.size() > 10) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "REVIEW_PHOTO_LIMIT_EXCEEDED", "Too many review photos");
         }
 
         for (String raw : rawUrls) {
@@ -259,7 +266,12 @@ public class ReviewValidationService {
                     blankToNull(raw);
 
             if (value != null) {
-                out.add(value);
+                out.add(trustedUrls.requireOwnedStorageUrl(
+                        value,
+                        "reviews",
+                        userId,
+                        "REVIEW_PHOTO_URL_INVALID"
+                ));
             }
         }
 

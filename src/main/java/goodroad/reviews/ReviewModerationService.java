@@ -181,7 +181,6 @@ public class ReviewModerationService {
         }
 
         review.setStatus(STATUS_REJECTED);
-        review.setAwardedPoints(0);
         review.setTakenByModeratorId(null);
         review.setTakenAt(null);
         review.setModeratedBy(moderator.getId());
