@@ -13,10 +13,18 @@ public class TaskController {
 
     @GetMapping
     public List<TaskService.TaskView> feed(Authentication authentication,
-                                          @RequestParam(required = false) String activityType,
-                                          @RequestParam(required = false) Double latitude,
-                                          @RequestParam(required = false) Double longitude) {
+                                           @RequestParam(required = false) String activityType,
+                                           @RequestParam(required = false) Double latitude,
+                                           @RequestParam(required = false) Double longitude) {
         return service.feed(authentication.getName(), activityType, latitude, longitude);
+    }
+
+    @PostMapping("/generation")
+    public TaskService.GenerationResult generate(
+            Authentication authentication,
+            @RequestBody TaskService.GenerationReq request
+    ) {
+        return service.generateForCurrentLocation(authentication.getName(), request);
     }
 
     @GetMapping("/completed")
@@ -24,16 +32,4 @@ public class TaskController {
         return service.completed(authentication.getName());
     }
 
-    @PostMapping
-    public TaskService.TaskView create(@RequestBody TaskService.TaskCreateReq req) {
-        return service.createTask(req);
-    }
-
-    @PostMapping("/{taskId}/targets/{targetId}/complete")
-    public void completeTarget(
-            Authentication authentication,
-            @PathVariable String taskId,
-            @PathVariable String targetId) {
-        service.completeTarget(authentication.getName(), taskId, targetId);
-    }
 }

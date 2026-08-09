@@ -1,6 +1,7 @@
 package goodroad.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import goodroad.points.PointLedgerService;
 import goodroad.rewards.*;
 import goodroad.tasks.*;
 import org.junit.jupiter.api.*;
@@ -28,6 +29,9 @@ class TasksRewardsHttpApiTest {
 
     @Mock
     RewardService rewardService;
+
+    @Mock
+    PointLedgerService pointLedgerService;
 
     @Test
     void shouldUseTaskRoutes() throws Exception {
@@ -64,6 +68,14 @@ class TasksRewardsHttpApiTest {
                 )
         ));
 
+        when(taskService.generateForCurrentLocation(eq("+79990000001"), any(TaskService.GenerationReq.class)))
+                .thenReturn(new TaskService.GenerationResult(
+                        2,
+                        false,
+                        null,
+                        Instant.parse("2026-06-01T10:00:00Z")
+                ));
+
         mvc.perform(get("/tasks")
                         .principal(principal("+79990000001"))
                         .param("activityType", "REVIEW")
@@ -79,28 +91,24 @@ class TasksRewardsHttpApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].pointsAwarded").value(30));
 
-        mvc.perform(post("/tasks")
+        mvc.perform(post("/tasks/generation")
+                        .principal(principal("+79990000001"))
                         .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "activityType": "REVIEW",
-                                  "title": "Оцените три точки",
-                                  "targetCount": 3,
-                                  "targets": [
-                                    {"targetType":"OBSTACLE_FEATURE","targetId":1,"title":"А"},
-                                    {"targetType":"OBSTACLE_FEATURE","targetId":2,"title":"Б"},
-                                    {"targetType":"OBSTACLE_FEATURE","targetId":3,"title":"В"}
-                                  ]
+                                  "latitude": 59.93,
+                                  "longitude": 30.31
                                 }
                                 """))
-                .andExpect(status().isOk());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.createdTasks").value(2));
 
-        verify(taskService).createTask(any(TaskService.TaskCreateReq.class));
+        verify(taskService).generateForCurrentLocation(eq("+79990000001"), any(TaskService.GenerationReq.class));
     }
 
     @Test
     void shouldUseRewardRoutes() throws Exception {
-        MockMvc mvc = standaloneSetup(new RewardController(rewardService)).build();
+        MockMvc mvc = standaloneSetup(new RewardController(rewardService, pointLedgerService)).build();
 
         when(rewardService.listOffers(100, 500, "price_asc")).thenReturn(List.of(
                 new RewardService.RewardOfferView(
@@ -108,12 +116,15 @@ class TasksRewardsHttpApiTest {
                         "Кофейня",
                         "Кофе",
                         "Описание",
-                        100
+                        "PROMOCODE",
+                        100,
+                        2
                 )
         ));
 
-        when(rewardService.getUserPointsInfo("+79990000001")).thenReturn(
-                new RewardService.AccountResp(
+        when(pointLedgerService.account("+79990000001")).thenReturn(
+                new PointLedgerService.PointsAccountView(
+                        "10",
                         400,
                         900,
                         2,
@@ -129,13 +140,28 @@ class TasksRewardsHttpApiTest {
                                 "Кофейня",
                                 "Кофе",
                                 "Описание",
-                                100
+                                "PROMOCODE",
+                                100,
+                                1
+                        ),
+                        new RewardService.UserRewardView(
+                                "50",
+                                "1",
+                                "Кофейня",
+                                "Кофе",
+                                "PROMOCODE",
+                                "COFFEE-1",
+                                100,
+                                "ACTIVE",
+                                Instant.parse("2026-06-01T10:00:00Z"),
+                                null,
+                                null
                         ),
                         300
                 ));
 
-        when(rewardService.getLeaderboard()).thenReturn(List.of(
-                new RewardService.LeaderboardItem(
+        when(pointLedgerService.leaderboard()).thenReturn(List.of(
+                new PointLedgerService.LeaderboardItem(
                         "10",
                         "Иван",
                         "Петров",

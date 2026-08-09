@@ -28,6 +28,20 @@ insert into reward_offer(partner_name, title, description, price, active) values
                                                                               ('OnlineDesk', 'Рабочее место онлайн', 'Купон на цифровой рабочий стол и набор продуктивности.', 210, true)
     on conflict do nothing;
 
+update reward_offer
+set reward_type = coalesce(reward_type, 'PROMOCODE'),
+    validity_days = coalesce(validity_days, 30)
+where active = true;
+
+
+insert into reward_inventory_item(reward_offer_id, code, status)
+select offer.id,
+       'GOODROAD-' || offer.id || '-' || item_number,
+       'AVAILABLE'
+from reward_offer offer
+         cross join generate_series(1, 5) as item_number
+    on conflict (reward_offer_id, code) do nothing;
+
 update task set status = 'ARCHIVED' where activity_type = 'VOLUNTEER' and target_count in (5, 10) and status = 'ACTIVE';
 
 insert into task(activity_type, title, points, target_count, status, auto_generated, center_latitude, center_longitude) values
