@@ -8,7 +8,9 @@ import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.GeoUtils;
 import goodroad.validation.InputRules;
+import goodroad.validation.TrustedUrlService;
 import goodroad.volunteer.repository.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,7 @@ public class VolunteerService {
     private final VolunteerApplicationPhotoRepo applicationPhotos;
     private final HelpRequestRepo requests;
     private final StorageService storageService;
+    private final TrustedUrlService trustedUrls;
 
     @Autowired(required = false)
     private PointLedgerService pointLedger;
@@ -45,13 +48,15 @@ public class VolunteerService {
             VolunteerApplicationRepo applications,
             VolunteerApplicationPhotoRepo applicationPhotos,
             HelpRequestRepo requests,
-            StorageService storageService
+            StorageService storageService,
+            TrustedUrlService trustedUrls
     ) {
         this.users = users;
         this.applications = applications;
         this.applicationPhotos = applicationPhotos;
         this.requests = requests;
         this.storageService = storageService;
+        this.trustedUrls = trustedUrls;
     }
 
     public record VolunteerMenuResp(boolean volunteer, String applicationStatus, String rejectReason) {}
@@ -103,17 +108,29 @@ public class VolunteerService {
 
         VolunteerApplicationEntity app = new VolunteerApplicationEntity();
         app.setApplicant(user);
-        app.setDobroUrl(requireUrl(req.dobroUrl(), "DOBRO_URL_INVALID", "Dobro.ru link is invalid"));
+        app.setDobroUrl(trustedUrls.requireDobroProfileUrl(req.dobroUrl()));
         app.setPhone(Crypto.normPhone(req.phone()));
         if (app.getPhone().isEmpty()) {
             throw bad("PHONE_INVALID", "Phone is invalid");
         }
-        app.setSocialNickname(InputRules.trimToNull(req.socialNickname()));
+        String socialNickname = InputRules.trimToNull(req.socialNickname());
+        if (socialNickname != null && socialNickname.length() > 120) {
+            throw bad("SOCIAL_NICKNAME_TOO_LONG", "Social nickname is too long");
+        }
+        app.setSocialNickname(socialNickname);
         applications.save(app);
 
         if (req.certificatePhotoUrls() != null) {
+            if (req.certificatePhotoUrls().size() > 10) {
+                throw bad("CERTIFICATE_PHOTO_LIMIT_EXCEEDED", "Too many certificate photos");
+            }
             for (String rawUrl : req.certificatePhotoUrls()) {
-                String url = requireUrl(rawUrl, "CERTIFICATE_URL_INVALID", "Certificate URL is invalid");
+                String url = trustedUrls.requireOwnedStorageUrl(
+                        rawUrl,
+                        "volunteer-certificates",
+                        user.getId(),
+                        "CERTIFICATE_URL_INVALID"
+                );
                 VolunteerApplicationPhotoEntity photo = new VolunteerApplicationPhotoEntity();
                 photo.setApplication(app);
                 photo.setUrl(url);
@@ -200,8 +217,18 @@ public class VolunteerService {
     @Transactional(readOnly = true)
     public List<HelpRequestResp> listAvailableRequests(String phoneFromAuth, Double latitude, Double longitude) {
         UserEntity volunteer = requireVolunteer(phoneFromAuth);
+        if ((latitude == null) != (longitude == null)) {
+            throw bad("LOCATION_INCOMPLETE", "Latitude and longitude must be provided together");
+        }
+        if (latitude != null) {
+            GeoUtils.requireCoordinates(latitude, longitude, "LOCATION_INVALID");
+        }
         return requests.findByStatusOrderByDateAscTimeAscCreatedAtAsc("OPEN").stream()
                 .filter(request -> !request.getRequester().getId().equals(volunteer.getId()))
+                .filter(request -> !isPast(request))
+                .filter(request -> latitude == null
+                        || request.getStartLatitude() != null && request.getStartLongitude() != null
+                        && GeoUtils.distanceKm(latitude, longitude, request.getStartLatitude(), request.getStartLongitude()) <= 5.0)
                 .sorted(Comparator.comparing(HelpRequestEntity::getDate).thenComparing(HelpRequestEntity::getTime))
                 .map(request -> toHelpResp(request, volunteer, false))
                 .toList();
@@ -216,7 +243,7 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp cancelOwnRequest(String phoneFromAuth, String id) {
         UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         requireRequester(request, user);
         if ("COMPLETED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_COMPLETED", "Completed request cannot be cancelled");
@@ -229,7 +256,7 @@ public class VolunteerService {
     @Transactional
     public void deleteOwnRequest(String phoneFromAuth, String id) {
         UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         requireRequester(request, user);
         if ("COMPLETED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_COMPLETED", "Completed request cannot be deleted");
@@ -246,9 +273,12 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp acceptRequest(String phoneFromAuth, String id) {
         UserEntity volunteer = requireVolunteer(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         if (!"OPEN".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_OPEN", "Help request is not open");
+        }
+        if (isPast(request)) {
+            throw new ApiException(HttpStatus.CONFLICT, "REQUEST_START_IN_PAST", "Help request start time is in the past");
         }
         if (request.getRequester().getId().equals(volunteer.getId())) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "OWN_REQUEST_ACCEPT", "Volunteer cannot accept own request");
@@ -262,7 +292,7 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp withdrawResponse(String phoneFromAuth, String id) {
         UserEntity volunteer = requireVolunteer(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         requireVolunteerOfRequest(request, volunteer);
         if (!"ACCEPTED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_CANNOT_WITHDRAW", "Response cannot be withdrawn");
@@ -276,7 +306,7 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp setWalkRoute(String phoneFromAuth, String id, WalkRouteReq req) {
         UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         requireParticipant(request, user);
         if (!"ACCEPTED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_ACCEPTED", "Route can be saved only for accepted request");
@@ -288,7 +318,7 @@ public class VolunteerService {
     @Transactional
     public HelpRequestResp finishWalk(String phoneFromAuth, String id) {
         UserEntity user = findCurrent(phoneFromAuth);
-        HelpRequestEntity request = findRequest(id);
+        HelpRequestEntity request = findRequestForUpdate(id);
         requireParticipant(request, user);
         if (!"ACCEPTED".equals(request.getStatus())) {
             throw new ApiException(HttpStatus.CONFLICT, "REQUEST_NOT_ACCEPTED", "Walk can be finished only for accepted request");
@@ -306,7 +336,10 @@ public class VolunteerService {
             if (pointLedger != null) {
                 pointLedger.earn(volunteer, WALK_REWARD, "VOLUNTEER_WALK_COMPLETED", "Завершена волонтерская прогулка", null, "HELP_REQUEST", request.getId());
             } else {
-                volunteer.setTotalPoints(volunteer.getTotalPoints() + WALK_REWARD);
+                int currentPoints = volunteer.getTotalPoints() == null ? 0 : Math.max(0, volunteer.getTotalPoints());
+                volunteer.setTotalPoints(currentPoints > Integer.MAX_VALUE - WALK_REWARD
+                        ? Integer.MAX_VALUE
+                        : currentPoints + WALK_REWARD);
                 users.save(volunteer);
             }
             if (taskService != null) {
@@ -371,6 +404,12 @@ public class VolunteerService {
         if (phone.isEmpty()) {
             throw bad("PHONE_INVALID", "Phone is invalid");
         }
+        if (fromAddress.length() > 500 || toAddress.length() > 500) {
+            throw bad("ADDRESS_TOO_LONG", "Address is too long");
+        }
+        if (comment.length() > 2000) {
+            throw bad("COMMENT_TOO_LONG", "Comment is too long");
+        }
         request.setFromAddress(fromAddress);
         request.setToAddress(toAddress);
         if (req.startLatitude() != null || req.startLongitude() != null) {
@@ -378,10 +417,19 @@ public class VolunteerService {
         }
         request.setStartLatitude(req.startLatitude());
         request.setStartLongitude(req.startLongitude());
-        request.setDate(parseDate(req.date()));
-        request.setTime(parseTime(req.time()));
+        LocalDate date = parseDate(req.date());
+        LocalTime time = parseTime(req.time());
+        if (LocalDateTime.of(date, time).isBefore(LocalDateTime.now())) {
+            throw bad("REQUEST_START_IN_PAST", "Help request start time must be in the future");
+        }
+        request.setDate(date);
+        request.setTime(time);
         request.setPhone(phone);
-        request.setSocialNickname(InputRules.trimToNull(req.socialNickname()));
+        String socialNickname = InputRules.trimToNull(req.socialNickname());
+        if (socialNickname != null && socialNickname.length() > 120) {
+            throw bad("SOCIAL_NICKNAME_TOO_LONG", "Social nickname is too long");
+        }
+        request.setSocialNickname(socialNickname);
         request.setComment(comment);
     }
 
@@ -446,10 +494,7 @@ public class VolunteerService {
     }
 
     private void validateCoordinates(Double latitude, Double longitude) {
-        if (latitude == null || longitude == null
-                || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-            throw bad("LOCATION_INVALID", "Location is invalid");
-        }
+        GeoUtils.requireCoordinates(latitude, longitude, "LOCATION_INVALID");
     }
 
     private UserEntity findCurrent(String phoneFromAuth) {
@@ -458,6 +503,7 @@ public class VolunteerService {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
         }
         return users.findByPhoneHash(Crypto.sha256Hex(phoneNorm))
+                .filter(UserEntity::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
     }
 
@@ -514,9 +560,16 @@ public class VolunteerService {
                 .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HELP_REQUEST_NOT_FOUND", "Help request not found"));
     }
 
+    private HelpRequestEntity findRequestForUpdate(String id) {
+        return requests.findByIdForUpdate(parseId(id, "HELP_REQUEST_ID_INVALID", "Help request id is invalid"))
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "HELP_REQUEST_NOT_FOUND", "Help request not found"));
+    }
+
     private Long parseId(String raw, String code, String msg) {
         try {
-            return Long.parseLong(raw);
+            long value = Long.parseLong(raw);
+            if (value <= 0) throw new NumberFormatException();
+            return value;
         } catch (Exception e) {
             throw new ApiException(HttpStatus.BAD_REQUEST, code, msg);
         }
@@ -538,12 +591,8 @@ public class VolunteerService {
         }
     }
 
-    private String requireUrl(String raw, String code, String msg) {
-        String value = InputRules.trimToNull(raw);
-        if (value == null || !(value.startsWith("http://") || value.startsWith("https://"))) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, code, msg);
-        }
-        return value;
+    private boolean isPast(HelpRequestEntity request) {
+        return LocalDateTime.of(request.getDate(), request.getTime()).isBefore(LocalDateTime.now());
     }
 
     private ApiException bad(String code, String msg) {
