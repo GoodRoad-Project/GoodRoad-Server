@@ -6,6 +6,7 @@ import goodroad.points.repository.PointTransactionRepo;
 import goodroad.rewards.RewardService;
 import goodroad.rewards.repository.RewardOfferEntity;
 import goodroad.rewards.repository.RewardOfferRepo;
+import goodroad.rewards.repository.RewardInventoryItemRepo;
 import goodroad.rewards.repository.UserRewardPurchaseRepo;
 import goodroad.service.GraphHopperService;
 import goodroad.users.repository.UserEntity;
@@ -135,6 +136,7 @@ class CacheBehaviorTest {
     void shouldCacheRewardOffersForSameFilterAndSort() {
         UserRepo users = mock(UserRepo.class);
         RewardOfferRepo offers = mock(RewardOfferRepo.class);
+        RewardInventoryItemRepo inventory = mock(RewardInventoryItemRepo.class);
         UserRewardPurchaseRepo purchases = mock(UserRewardPurchaseRepo.class);
         PointLedgerService ledger = mock(PointLedgerService.class);
 
@@ -142,9 +144,10 @@ class CacheBehaviorTest {
                 offer(1L, "Кофейня", "Кофе", 100),
                 offer(2L, "Кино", "Билет", 300)
         ));
+        when(inventory.countAvailable(anyLong(), any())).thenReturn(5L);
 
         try (AnnotationConfigApplicationContext context = cacheContext()) {
-            context.registerBean(RewardService.class, () -> new RewardService(users, offers, purchases, ledger));
+            context.registerBean(RewardService.class, () -> new RewardService(users, offers, inventory, purchases, ledger));
             context.refresh();
 
             RewardService service = context.getBean(RewardService.class);
@@ -164,6 +167,7 @@ class CacheBehaviorTest {
         UserRepo users = mock(UserRepo.class);
         PointTransactionRepo transactions = mock(PointTransactionRepo.class);
         UserEntity user = user(10L, 100, 200);
+        when(users.findByIdForUpdate(10L)).thenReturn(java.util.Optional.of(user));
 
         try (AnnotationConfigApplicationContext context = cacheContext()) {
             context.registerBean(PointLedgerService.class, () -> new PointLedgerService(users, transactions));

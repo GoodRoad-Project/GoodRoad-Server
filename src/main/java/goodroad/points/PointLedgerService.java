@@ -2,6 +2,7 @@ package goodroad.points;
 
 import goodroad.api.ApiErrors.ApiException;
 import goodroad.config.CacheConfig;
+import goodroad.model.Role;
 import goodroad.points.repository.*;
 import goodroad.security.Crypto;
 import goodroad.users.repository.*;
@@ -35,10 +36,11 @@ public class PointLedgerService {
     @Transactional
     public void earn(UserEntity user, int amount, String reason, String details, Long taskId, String sourceType, Long sourceId) {
         if (amount <= 0) return;
-        user.setTotalPoints(safe(user.getTotalPoints()) + amount);
-        user.setLifetimePoints(safe(user.getLifetimePoints()) + amount);
-        users.save(user);
-        saveTx(user.getId(), "EARN", amount, reason, details, taskId, null, sourceType, sourceId);
+        UserEntity account = lockUser(user);
+        account.setTotalPoints(safeAdd(account.getTotalPoints(), amount));
+        account.setLifetimePoints(safeAdd(account.getLifetimePoints(), amount));
+        users.save(account);
+        saveTx(account.getId(), "EARN", amount, reason, details, taskId, null, sourceType, sourceId);
     }
 
     @Caching(evict = {
@@ -48,12 +50,13 @@ public class PointLedgerService {
     @Transactional
     public void spend(UserEntity user, int amount, String reason, String details, Long rewardOfferId) {
         if (amount <= 0) throw new ApiException(HttpStatus.BAD_REQUEST, "POINT_AMOUNT_INVALID", "Point amount is invalid");
-        if (safe(user.getTotalPoints()) < amount) {
+        UserEntity account = lockUser(user);
+        if (safe(account.getTotalPoints()) < amount) {
             throw new ApiException(HttpStatus.CONFLICT, "POINT_BALANCE_NOT_ENOUGH", "Not enough points");
         }
-        user.setTotalPoints(safe(user.getTotalPoints()) - amount);
-        users.save(user);
-        saveTx(user.getId(), "SPEND", amount, reason, details, null, rewardOfferId, "REWARD_PURCHASE", rewardOfferId);
+        account.setTotalPoints(safe(account.getTotalPoints()) - amount);
+        users.save(account);
+        saveTx(account.getId(), "SPEND", amount, reason, details, null, rewardOfferId, "REWARD_PURCHASE", rewardOfferId);
     }
 
     @Transactional(readOnly = true)
@@ -80,7 +83,8 @@ public class PointLedgerService {
     @Cacheable(cacheNames = CacheConfig.POINTS_LEADERBOARD, key = "'all'", unless = "#result == null")
     @Transactional(readOnly = true)
     public List<LeaderboardItem> leaderboard() {
-        return users.findAll().stream()
+        return users.findByRoleIn(List.of(Role.USER.name(), Role.VOLUNTEER.name())).stream()
+                .filter(UserEntity::isActive)
                 .sorted(Comparator.comparingInt((UserEntity u) -> -Math.max(safe(u.getLifetimePoints()), safe(u.getTotalPoints()))).thenComparing(UserEntity::getId))
                 .map(user -> {
                     int lifetime = Math.max(safe(user.getLifetimePoints()), safe(user.getTotalPoints()));
@@ -103,13 +107,6 @@ public class PointLedgerService {
         transactions.save(tx);
     }
 
-    private UserEntity findCurrent(String phoneFromAuth) {
-        String phoneNorm = Crypto.normPhone(phoneFromAuth);
-        if (phoneNorm.isEmpty()) throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
-        return users.findByPhoneHash(Crypto.sha256Hex(phoneNorm))
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
-    }
-
     private PointsAccountView toAccountView(UserEntity user) {
         int balance = safe(user.getTotalPoints());
         int lifetime = Math.max(safe(user.getLifetimePoints()), balance);
@@ -127,7 +124,32 @@ public class PointLedgerService {
         return "Новичок GoodRoad";
     }
 
-    private static int safe(Integer value) { return value == null ? 0 : Math.max(0, value); }
+    private int safeAdd(Integer currentValue, int amount) {
+        long result = (long) safe(currentValue) + amount;
+        return result > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) result;
+    }
+
+    private UserEntity lockUser(UserEntity user) {
+        if (user == null || user.getId() == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found");
+        }
+        return users.findByIdForUpdate(user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
+    }
+
+    private UserEntity findCurrent(String phoneFromAuth) {
+        String phoneNorm = Crypto.normPhone(phoneFromAuth);
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
+        }
+        return users.findByPhoneHash(Crypto.sha256Hex(phoneNorm))
+                .filter(UserEntity::isActive)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+    }
+
+    private static int safe(Integer value) {
+        return value == null ? 0 : Math.max(0, value);
+    }
 
     public static PointTransactionView toView(PointTransactionEntity tx) {
         return new PointTransactionView(
