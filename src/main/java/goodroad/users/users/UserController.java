@@ -31,11 +31,10 @@ public class UserController {
 
     @PostMapping("")
     public void changePassword(
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword
+            @RequestBody UserSettingsService.ChangePasswordReq req
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        service.changePassword(currentUsername, oldPassword, newPassword);
+        service.changePassword(currentUsername, req);
     }
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

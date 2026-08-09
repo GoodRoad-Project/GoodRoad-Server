@@ -6,6 +6,7 @@ import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.TrustedUrlService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,6 +35,9 @@ class UserSettingsServiceTest {
     @Mock
     private StorageService storageService;
 
+    @Mock
+    private TrustedUrlService trustedUrls;
+
     @InjectMocks
     private UserSettingsService service;
 
@@ -52,10 +56,12 @@ class UserSettingsServiceTest {
     @Test
     void shouldUpdateCurrentUser() {
         UserEntity user = user(1L, Role.USER.name());
-        when(users.findByPhoneHash(anyString())).thenReturn(Optional.of(user));
+        user.setPassHash("hash");
+        when(users.findByPhoneHashForUpdate(anyString())).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("pass", "hash")).thenReturn(true);
 
         UserSettingsService.UpdateSettingsReq req = new UserSettingsService.UpdateSettingsReq(
-                "Мария", "Петрова", "http://photo", "+79990000002"
+                "Мария", "Петрова", null, "+79990000002", "pass"
         );
 
         UserSettingsService.SettingsView view = service.updateCurrentUserSettings("+79990000001", req);
@@ -68,7 +74,10 @@ class UserSettingsServiceTest {
 
     @Test
     void shouldChangePasswordThroughAuthService() {
-        service.changePassword("+79990000001", "old", "new");
+        service.changePassword(
+                "+79990000001",
+                new UserSettingsService.ChangePasswordReq("old", "new")
+        );
 
         verify(authService).changePass("+79990000001", "old", "new");
     }
@@ -87,16 +96,6 @@ class UserSettingsServiceTest {
         assertEquals("http://avatar", resp.photoUrl());
         assertEquals("http://avatar", user.getPhotoUrl());
         verify(users).save(user);
-    }
-
-    @Test
-    void shouldRejectBadAvatarType() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", "avatar.txt", "text/plain", new byte[] {1}
-        );
-
-        assertThrows(RuntimeException.class,
-                () -> service.uploadAvatar("+79990000001", file));
     }
 
     @Test

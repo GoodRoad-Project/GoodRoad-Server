@@ -191,17 +191,23 @@ class HttpApiScenarioTest {
                                   "firstName": "Иван",
                                   "lastName": "Иванов",
                                   "photoUrl": null,
-                                  "phone": "+79990000001"
+                                  "phone": "+79990000001",
+                                  "currentPassword": "123"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lastName").value("Иванов"));
 
         mvc.perform(post("/users")
-                        .param("oldPassword", "123")
-                        .param("newPassword", "1234"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "oldPassword": "123",
+                                  "newPassword": "1234"
+                                }
+                                """))
                 .andExpect(status().isOk());
-        verify(userSettingsService).changePassword("+79990000001", "123", "1234");
+        verify(userSettingsService).changePassword(eq("+79990000001"), any(UserSettingsService.ChangePasswordReq.class));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "avatar.png", "image/png", new byte[]{1, 2, 3}

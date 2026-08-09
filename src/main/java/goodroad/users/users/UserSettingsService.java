@@ -8,38 +8,38 @@ import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import goodroad.validation.InputRules;
+import goodroad.validation.TrustedUrlService;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Set;
 
 @SuppressWarnings({"DuplicatedCode", "SpellCheckingInspection"})
 @Service
 public class UserSettingsService {
 
-    private static final long MAX_AVATAR_SIZE = 10 * 1024 * 1024;
-    private static final Set<String> ALLOWED_AVATAR_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
-
     private final UserRepo users;
     private final PasswordEncoder passwordEncoder;
     private final AuthService authService;
     private final StorageService storageService;
+    private final TrustedUrlService trustedUrls;
 
     public UserSettingsService(
             UserRepo users,
             PasswordEncoder passwordEncoder,
             AuthService authService,
-            StorageService storageService
+            StorageService storageService,
+            TrustedUrlService trustedUrls
     ) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.authService = authService;
         this.storageService = storageService;
+        this.trustedUrls = trustedUrls;
     }
 
     public record SettingsView(
@@ -56,13 +56,17 @@ public class UserSettingsService {
             String firstName,
             String lastName,
             String photoUrl,
-            String phone
+            String phone,
+            String currentPassword
     ) {
     }
 
     public record AvatarUploadResp(
             String photoUrl
     ) {
+    }
+
+    public record ChangePasswordReq(String oldPassword, String newPassword) {
     }
 
     public record DeleteAccountReq(
@@ -89,7 +93,7 @@ public class UserSettingsService {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
-        UserEntity user = findCurrent(phoneFromAuth);
+        UserEntity user = phone == null ? findCurrent(phoneFromAuth) : findCurrentForUpdate(phoneFromAuth);
 
         if (req.firstName() != null) {
             String firstName = InputRules.requireCyrillicText(req.firstName(), "USER_FIRST_NAME_INVALID", "First name");
@@ -100,9 +104,19 @@ public class UserSettingsService {
             user.setLastName(lastName);
         }
         if (req.photoUrl() != null) {
-            user.setPhotoUrl(photoUrl);
+            user.setPhotoUrl(photoUrl == null ? null : trustedUrls.requireOwnedStorageUrl(
+                    photoUrl,
+                    "avatars",
+                    user.getId(),
+                    "AVATAR_URL_INVALID"
+            ));
         }
         if (phone != null) {
+            if (req.currentPassword() == null || req.currentPassword().isBlank()
+                    || req.currentPassword().getBytes(StandardCharsets.UTF_8).length > 72
+                    || !passwordEncoder.matches(req.currentPassword(), user.getPassHash())) {
+                throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENTIALS_INVALID", "Credentials are invalid");
+            }
             String newPhoneNorm = Crypto.normPhone(phone);
             if (newPhoneNorm.isEmpty()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
@@ -124,22 +138,15 @@ public class UserSettingsService {
     }
 
     @Transactional
-    public void changePassword(String phoneFromAuth, String oldPassword, String newPassword) {
-        authService.changePass(phoneFromAuth, oldPassword, newPassword);
+    public void changePassword(String phoneFromAuth, ChangePasswordReq req) {
+        if (req == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_CHANGE_EMPTY", "Password change request is empty");
+        }
+        authService.changePass(phoneFromAuth, req.oldPassword(), req.newPassword());
     }
 
     @Transactional
     public AvatarUploadResp uploadAvatar(String phoneFromAuth, MultipartFile file) {
-        if (file == null || file.isEmpty()) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_EMPTY", "Avatar file is empty");
-        }
-        if (file.getSize() > MAX_AVATAR_SIZE) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_TOO_LARGE", "Avatar file is too large");
-        }
-        if (file.getContentType() == null || !ALLOWED_AVATAR_TYPES.contains(file.getContentType())) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "AVATAR_TYPE_INVALID", "Avatar file type is invalid");
-        }
-
         UserEntity user = findCurrent(phoneFromAuth);
 
         String photoUrl = storageService.uploadAvatar(file, user.getId().toString());
@@ -152,11 +159,11 @@ public class UserSettingsService {
     @Transactional
     public void deleteCurrent(String phoneFromAuth, DeleteAccountReq req) {
         UserEntity user = requireCurrentWithPassword(phoneFromAuth, req);
-        if (!Role.USER.name().equals(user.getRole())) {
+        if (Role.MODERATOR.name().equals(user.getRole()) || Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
                     "USER_CANT_DELETE",
-                    "Only regular users can delete their account"
+                    "Moderator accounts can only be deleted by an administrator"
             );
         }
 
@@ -182,7 +189,8 @@ public class UserSettingsService {
     }
 
     private UserEntity requireCurrentWithPassword(String phoneFromAuth, DeleteAccountReq req) {
-        if (req == null || req.password() == null || req.password().isBlank()) {
+        if (req == null || req.password() == null || req.password().isBlank()
+                || req.password().getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_INVALID", "Password is invalid");
         }
 
@@ -213,6 +221,17 @@ public class UserSettingsService {
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
         return users.findByPhoneHash(phoneHash)
+                .filter(UserEntity::isActive)
+                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+    }
+
+    private UserEntity findCurrentForUpdate(String phoneFromAuth) {
+        String phoneNorm = Crypto.normPhone(phoneFromAuth);
+        if (phoneNorm.isEmpty()) {
+            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
+        }
+        return users.findByPhoneHashForUpdate(Crypto.sha256Hex(phoneNorm))
+                .filter(UserEntity::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
     }
 
