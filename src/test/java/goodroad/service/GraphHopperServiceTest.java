@@ -1,6 +1,7 @@
 package goodroad.service;
 
 import goodroad.model.gh.GraphHopperResponse;
+import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.gh.Path;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
@@ -87,21 +88,21 @@ class GraphHopperServiceTest {
     }
 
     @Test
-    void shouldReturnNull_IfServerReturnsError() throws Exception {
+    void shouldReturnBadGatewayErrorIfProviderReturnsError() {
         mockWebServer.enqueue(new MockResponse()
                 .setResponseCode(500)
                 .setBody("Internal Server Error"));
 
-        GraphHopperResponse response = graphHopperService.getRoute(
+        ApiException exception = assertThrows(ApiException.class, () -> graphHopperService.getRoute(
                 "59.932480,30.262920",
                 "59.928767,30.264197",
                 "foot",
                 true,
                 "ru",
                 null
-        );
+        ));
 
-        assertNull(response);
+        assertEquals("ROUTING_PROVIDER_ERROR", exception.code());
     }
 
     @Test
