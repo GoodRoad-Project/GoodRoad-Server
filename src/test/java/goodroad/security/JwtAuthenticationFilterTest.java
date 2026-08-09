@@ -41,6 +41,7 @@ class JwtAuthenticationFilterTest {
         Claims claims = Jwts.claims()
                 .subject("+79990001122")
                 .add("role", "USER")
+                .add("tokenType", "ACCESS")
                 .build();
 
         UserEntity user = UserEntity.builder()
@@ -51,6 +52,7 @@ class JwtAuthenticationFilterTest {
         user.setId(10L);
 
         when(jwtService.parseClaims("valid-token")).thenReturn(claims);
+        when(jwtService.isAccessToken(claims)).thenReturn(true);
         when(users.findByPhoneHash(Crypto.sha256Hex("79990001122"))).thenReturn(Optional.of(user));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -123,11 +125,34 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void shouldNotAuthenticateLegacyTokenWithoutExplicitAccessType() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, users);
+        Claims claims = Jwts.claims()
+                .subject("+79990001122")
+                .add("role", "USER")
+                .build();
+
+        when(jwtService.parseClaims("legacy-token")).thenReturn(claims);
+        when(jwtService.isAccessToken(claims)).thenReturn(false);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer legacy-token");
+        AtomicReference<Authentication> authenticationAfterFilter = new AtomicReference<>();
+        FilterChain chain = (req, resp) -> authenticationAfterFilter.set(SecurityContextHolder.getContext().getAuthentication());
+
+        filter.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertNull(authenticationAfterFilter.get());
+        verifyNoInteractions(users);
+    }
+
+    @Test
     void shouldNotAuthenticateInactiveUser() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtService, users);
         Claims claims = Jwts.claims()
                 .subject("+79990001122")
                 .add("role", "USER")
+                .add("tokenType", "ACCESS")
                 .build();
 
         UserEntity user = UserEntity.builder()
@@ -137,6 +162,7 @@ class JwtAuthenticationFilterTest {
                 .build();
 
         when(jwtService.parseClaims("valid-token")).thenReturn(claims);
+        when(jwtService.isAccessToken(claims)).thenReturn(true);
         when(users.findByPhoneHash(Crypto.sha256Hex("79990001122"))).thenReturn(Optional.of(user));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
@@ -156,6 +182,7 @@ class JwtAuthenticationFilterTest {
         Claims claims = Jwts.claims()
                 .subject("+79990001122")
                 .add("role", "USER")
+                .add("tokenType", "ACCESS")
                 .build();
 
         UserEntity user = UserEntity.builder()
@@ -165,6 +192,7 @@ class JwtAuthenticationFilterTest {
                 .build();
 
         when(jwtService.parseClaims("valid-token")).thenReturn(claims);
+        when(jwtService.isAccessToken(claims)).thenReturn(true);
         when(users.findByPhoneHash(Crypto.sha256Hex("79990001122"))).thenReturn(Optional.of(user));
 
         MockHttpServletRequest request = new MockHttpServletRequest();
