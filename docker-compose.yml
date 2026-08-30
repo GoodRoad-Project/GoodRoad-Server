@@ -53,6 +53,7 @@ services:
       YC_ACCESS_KEY: ${YC_ACCESS_KEY}
       YC_SECRET_KEY: ${YC_SECRET_KEY}
       YC_BUCKET: ${YC_BUCKET}
+      GRAPHHOPPER_API_KEY: ${GRAPHHOPPER_API_KEY}
     depends_on:
       db:
         condition: service_healthy

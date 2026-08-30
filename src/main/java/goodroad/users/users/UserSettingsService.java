@@ -14,6 +14,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -27,6 +29,8 @@ public class UserSettingsService {
     private final AuthService authService;
     private final StorageService storageService;
     private final TrustedUrlService trustedUrls;
+
+    private static final Logger log = LoggerFactory.getLogger(UserSettingsService.class);
 
     public UserSettingsService(
             UserRepo users,
@@ -55,9 +59,7 @@ public class UserSettingsService {
     public record UpdateSettingsReq(
             String firstName,
             String lastName,
-            String photoUrl,
-            String phone,
-            String currentPassword
+            String photoUrl
     ) {
     }
 
@@ -67,6 +69,12 @@ public class UserSettingsService {
     }
 
     public record ChangePasswordReq(String oldPassword, String newPassword) {
+    }
+
+    public record ChangePhoneReq(
+            String phone,
+            String currentPassword
+    ) {
     }
 
     public record DeleteAccountReq(
@@ -87,22 +95,31 @@ public class UserSettingsService {
         }
 
         String photoUrl = blankToNull(req.photoUrl());
-        String phone = blankToNull(req.phone());
 
-        if (req.firstName() == null && req.lastName() == null && req.photoUrl() == null && req.phone() == null) {
+        if (req.firstName() == null && req.lastName() == null && req.photoUrl() == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
 
-        UserEntity user = phone == null ? findCurrent(phoneFromAuth) : findCurrentForUpdate(phoneFromAuth);
+        UserEntity user = findCurrent(phoneFromAuth);
 
         if (req.firstName() != null) {
-            String firstName = InputRules.requireCyrillicText(req.firstName(), "USER_FIRST_NAME_INVALID", "First name");
+            String firstName = InputRules.requireCyrillicText(
+                    req.firstName(),
+                    "USER_FIRST_NAME_INVALID",
+                    "First name"
+            );
             user.setFirstName(firstName);
         }
+
         if (req.lastName() != null) {
-            String lastName = InputRules.requireCyrillicText(req.lastName(), "USER_LAST_NAME_INVALID", "Last name");
+            String lastName = InputRules.requireCyrillicText(
+                    req.lastName(),
+                    "USER_LAST_NAME_INVALID",
+                    "Last name"
+            );
             user.setLastName(lastName);
         }
+
         if (req.photoUrl() != null) {
             user.setPhotoUrl(photoUrl == null ? null : trustedUrls.requireOwnedStorageUrl(
                     photoUrl,
@@ -111,37 +128,93 @@ public class UserSettingsService {
                     "AVATAR_URL_INVALID"
             ));
         }
-        if (phone != null) {
-            if (req.currentPassword() == null || req.currentPassword().isBlank()
-                    || req.currentPassword().getBytes(StandardCharsets.UTF_8).length > 72
-                    || !passwordEncoder.matches(req.currentPassword(), user.getPassHash())) {
-                throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENTIALS_INVALID", "Credentials are invalid");
-            }
-            String newPhoneNorm = Crypto.normPhone(phone);
-            if (newPhoneNorm.isEmpty()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "PHONE_INVALID", "Phone number is invalid");
-            }
-
-            String newPhoneHash = Crypto.sha256Hex(newPhoneNorm);
-            users.findByPhoneHash(newPhoneHash)
-                    .filter(other -> !other.getId().equals(user.getId()))
-                    .ifPresent(other -> {
-                        throw new ApiException(HttpStatus.CONFLICT, "PHONE_ALREADY_USED", "Phone number already used");
-                    });
-
-            user.setPhoneHash(newPhoneHash);
-        }
 
         user.setLastActiveAt(Instant.now());
         users.save(user);
+
         return toView(user);
     }
 
     @Transactional
+    public SettingsView changePhone(String phoneFromAuth, ChangePhoneReq req) {
+        try {
+            if (req == null) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "PHONE_CHANGE_EMPTY",
+                        "Phone change request is empty"
+                );
+            }
+
+            String phone = req.phone();
+
+            if (phone == null || phone.isBlank()) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "PHONE_INVALID",
+                        "Phone number is invalid"
+                );
+            }
+
+            UserEntity user = findCurrentForUpdate(phoneFromAuth);
+
+            String currentPassword = req.currentPassword();
+
+            if (currentPassword == null || currentPassword.isBlank()
+                    || currentPassword.getBytes(StandardCharsets.UTF_8).length > 72
+                    || !passwordEncoder.matches(currentPassword, user.getPassHash())) {
+                throw new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "CREDENTIALS_INVALID",
+                        "Credentials are invalid"
+                );
+            }
+
+            String newPhoneNorm = Crypto.normPhone(phone);
+
+            if (newPhoneNorm.isEmpty()) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "PHONE_INVALID",
+                        "Phone number is invalid"
+                );
+            }
+
+            String newPhoneHash = Crypto.sha256Hex(newPhoneNorm);
+
+            users.findByPhoneHash(newPhoneHash)
+                    .filter(other -> !other.getId().equals(user.getId()))
+                    .ifPresent(other -> {
+                        throw new ApiException(
+                                HttpStatus.CONFLICT,
+                                "PHONE_ALREADY_USED",
+                                "Phone number already used"
+                        );
+                    });
+
+            user.setPhoneHash(newPhoneHash);
+            user.setLastActiveAt(Instant.now());
+            users.save(user);
+
+            return toView(user);
+        }
+        catch (Exception e) {
+            log.error("Error changing phone", e); // ← Добавить это
+            throw e;
+        }
+    }
+
+
+    @Transactional
     public void changePassword(String phoneFromAuth, ChangePasswordReq req) {
         if (req == null) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_CHANGE_EMPTY", "Password change request is empty");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "PASSWORD_CHANGE_EMPTY",
+                    "Password change request is empty"
+            );
         }
+
         authService.changePass(phoneFromAuth, req.oldPassword(), req.newPassword());
     }
 
@@ -159,7 +232,9 @@ public class UserSettingsService {
     @Transactional
     public void deleteCurrent(String phoneFromAuth, DeleteAccountReq req) {
         UserEntity user = requireCurrentWithPassword(phoneFromAuth, req);
-        if (Role.MODERATOR.name().equals(user.getRole()) || Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
+
+        if (Role.MODERATOR.name().equals(user.getRole())
+                || Role.MODERATOR_ADMIN.name().equals(user.getRole())) {
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
                     "USER_CANT_DELETE",
@@ -173,6 +248,7 @@ public class UserSettingsService {
     @Transactional
     public void deleteByAdmin(String phoneFromAuth, String id, DeleteAccountReq req) {
         UserEntity admin = requireCurrentWithPassword(phoneFromAuth, req);
+
         if (!Role.MODERATOR_ADMIN.name().equals(admin.getRole())) {
             throw new ApiException(
                     HttpStatus.FORBIDDEN,
@@ -182,8 +258,13 @@ public class UserSettingsService {
         }
 
         Long userId = parseId(id);
+
         UserEntity user = users.findById(userId)
-                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_ID_NOT_FOUND", "User id not found"));
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "USER_ID_NOT_FOUND",
+                        "User id not found"
+                ));
 
         users.delete(user);
     }
@@ -191,12 +272,21 @@ public class UserSettingsService {
     private UserEntity requireCurrentWithPassword(String phoneFromAuth, DeleteAccountReq req) {
         if (req == null || req.password() == null || req.password().isBlank()
                 || req.password().getBytes(StandardCharsets.UTF_8).length > 72) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "PASSWORD_INVALID", "Password is invalid");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "PASSWORD_INVALID",
+                    "Password is invalid"
+            );
         }
 
         UserEntity user = findCurrent(phoneFromAuth);
+
         if (!passwordEncoder.matches(req.password(), user.getPassHash())) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "CREDENTIALS_INVALID", "Credentials are invalid");
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "CREDENTIALS_INVALID",
+                    "Credentials are invalid"
+            );
         }
 
         return user;
@@ -215,31 +305,55 @@ public class UserSettingsService {
 
     private UserEntity findCurrent(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
+
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "USER_PHONE_NOT_FOUND",
+                    "User with given phone not found"
+            );
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);
+
         return users.findByPhoneHash(phoneHash)
                 .filter(UserEntity::isActive)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "USER_PHONE_NOT_FOUND",
+                        "User with given phone not found"
+                ));
     }
 
     private UserEntity findCurrentForUpdate(String phoneFromAuth) {
         String phoneNorm = Crypto.normPhone(phoneFromAuth);
+
         if (phoneNorm.isEmpty()) {
-            throw new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found");
+            throw new ApiException(
+                    HttpStatus.UNAUTHORIZED,
+                    "USER_PHONE_NOT_FOUND",
+                    "User with given phone not found"
+            );
         }
+
         return users.findByPhoneHashForUpdate(Crypto.sha256Hex(phoneNorm))
                 .filter(UserEntity::isActive)
-                .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.UNAUTHORIZED,
+                        "USER_PHONE_NOT_FOUND",
+                        "User with given phone not found"
+                ));
     }
 
     private Long parseId(String raw) {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {
-            throw new ApiException(HttpStatus.BAD_REQUEST, "ID_INVALID", "Id is invalid");
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "ID_INVALID",
+                    "Id is invalid"
+            );
         }
     }
 
@@ -247,6 +361,7 @@ public class UserSettingsService {
         if (value == null) {
             return null;
         }
+
         String s = value.trim();
         return s.isEmpty() ? null : s;
     }

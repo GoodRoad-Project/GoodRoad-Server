@@ -29,6 +29,14 @@ public class UserController {
         return service.updateCurrentUserSettings(currentUsername, req);
     }
 
+    @PutMapping("/phone")
+    public UserSettingsService.SettingsView changePhone(
+            @RequestBody UserSettingsService.ChangePhoneReq req
+    ) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        return service.changePhone(currentUsername, req);
+    }
+
     @PostMapping("")
     public void changePassword(
             @RequestBody UserSettingsService.ChangePasswordReq req
