@@ -22,7 +22,7 @@ import java.time.Instant;
 
 @SuppressWarnings({"DuplicatedCode", "SpellCheckingInspection"})
 @Service
-public class UserSettingsService {
+public class UserProfileService {
 
     private final UserRepo users;
     private final PasswordEncoder passwordEncoder;
@@ -30,9 +30,9 @@ public class UserSettingsService {
     private final StorageService storageService;
     private final TrustedUrlService trustedUrls;
 
-    private static final Logger log = LoggerFactory.getLogger(UserSettingsService.class);
+    private static final Logger log = LoggerFactory.getLogger(UserProfileService.class);
 
-    public UserSettingsService(
+    public UserProfileService(
             UserRepo users,
             PasswordEncoder passwordEncoder,
             AuthService authService,
@@ -46,7 +46,7 @@ public class UserSettingsService {
         this.trustedUrls = trustedUrls;
     }
 
-    public record SettingsView(
+    public record ProfileView(
             String id,
             String role,
             String firstName,
@@ -56,7 +56,7 @@ public class UserSettingsService {
     ) {
     }
 
-    public record UpdateSettingsReq(
+    public record UpdateProfileReq(
             String firstName,
             String lastName,
             String photoUrl
@@ -83,13 +83,13 @@ public class UserSettingsService {
     }
 
     @Transactional(readOnly = true)
-    public SettingsView getCurrentUser(String phoneFromAuth) {
+    public ProfileView getCurrentUser(String phoneFromAuth) {
         UserEntity user = findCurrent(phoneFromAuth);
         return toView(user);
     }
 
     @Transactional
-    public SettingsView updateCurrentUserSettings(String phoneFromAuth, UpdateSettingsReq req) {
+    public ProfileView updateProfile(String phoneFromAuth, UpdateProfileReq req) {
         if (req == null) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "USER_UPDATE_EMPTY", "No fields provided to update");
         }
@@ -136,7 +136,7 @@ public class UserSettingsService {
     }
 
     @Transactional
-    public SettingsView changePhone(String phoneFromAuth, ChangePhoneReq req) {
+    public ProfileView changePhone(String phoneFromAuth, ChangePhoneReq req) {
         try {
             if (req == null) {
                 throw new ApiException(
@@ -199,7 +199,7 @@ public class UserSettingsService {
             return toView(user);
         }
         catch (Exception e) {
-            log.error("Error changing phone", e); // ← Добавить это
+            log.error("Error changing phone", e);
             throw e;
         }
     }
@@ -292,8 +292,8 @@ public class UserSettingsService {
         return user;
     }
 
-    private SettingsView toView(UserEntity user) {
-        return new SettingsView(
+    private ProfileView toView(UserEntity user) {
+        return new ProfileView(
                 user.getId().toString(),
                 user.getRole(),
                 user.getFirstName(),
