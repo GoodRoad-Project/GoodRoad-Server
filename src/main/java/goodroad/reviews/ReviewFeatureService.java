@@ -40,6 +40,17 @@ public class ReviewFeatureService {
         return createFeature(input);
     }
 
+    public ObstacleFeatureEntity findExistingFeature(Long featureId) {
+        return features.findById(featureId)
+                .orElseThrow(() ->
+                        new ApiException(
+                                HttpStatus.NOT_FOUND,
+                                "OBSTACLE_FEATURE_NOT_FOUND",
+                                "Obstacle feature not found"
+                        )
+                );
+    }
+
     private ObstacleFeatureEntity createFeature(
             ReviewValidationService.ValidatedReviewInput input
     ) {
