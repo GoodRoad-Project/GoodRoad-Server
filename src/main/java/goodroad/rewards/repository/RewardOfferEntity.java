@@ -20,6 +20,8 @@ public class RewardOfferEntity {
     private String rewardType = "PROMOCODE";
     @Column(name = "validity_days")
     private Integer validityDays;
+    @Column(name = "total_quantity", nullable = false)
+    private Integer totalQuantity = 0;
     @Column(name = "active", nullable = false)
     private boolean active = true;
     @Column(name = "created_at", nullable = false)
@@ -32,6 +34,7 @@ public class RewardOfferEntity {
     public Integer getPrice(){return price;} public void setPrice(Integer price){this.price=price;}
     public String getRewardType(){return rewardType;} public void setRewardType(String rewardType){this.rewardType=rewardType;}
     public Integer getValidityDays(){return validityDays;} public void setValidityDays(Integer validityDays){this.validityDays=validityDays;}
+    public Integer getTotalQuantity(){return totalQuantity;} public void setTotalQuantity(Integer totalQuantity){this.totalQuantity=totalQuantity;}
     public boolean isActive(){return active;} public void setActive(boolean active){this.active=active;}
     public Instant getCreatedAt(){return createdAt;} public void setCreatedAt(Instant createdAt){this.createdAt=createdAt;}
 }
