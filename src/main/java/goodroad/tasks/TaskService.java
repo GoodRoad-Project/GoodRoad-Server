@@ -66,10 +66,9 @@ public class TaskService {
         }
         String type = requireValidActivityFilter(activityType);
         List<TaskEntity> raw = type == null
-                ? tasks.findByStatusOrderByCreatedAtDesc("ACTIVE")
-                : tasks.findByActivityTypeAndStatusOrderByCreatedAtDesc(type, "ACTIVE");
+                ? tasks.findByStatusAndAssignedUserIdOrderByCreatedAtDesc("ACTIVE", user.getId())
+                : tasks.findByActivityTypeAndStatusAndAssignedUserIdOrderByCreatedAtDesc(type, "ACTIVE", user.getId());
         raw = raw.stream()
-                .filter(task -> task.getAssignedUserId() == null || task.getAssignedUserId().equals(user.getId()))
                 .filter(task -> !taskCompletions.existsByUserIdAndTaskId(user.getId(), task.getId()))
                 .filter(task -> isNear(task.getCenterLatitude(), task.getCenterLongitude(), latitude, longitude))
                 .toList();
@@ -119,6 +118,27 @@ public class TaskService {
         state.setGeneratedAt(now);
         generationStates.save(state);
         return new GenerationResult(Math.max(0, after - before), false, null, now);
+    }
+
+    @Transactional(readOnly = true)
+    public Long resolveReviewFeatureId(Long userId, String taskTargetId) {
+        if (userId == null) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "TASK_TARGET_NOT_FOUND", "Цель задания не найдена");
+        }
+        long parsedTargetId = parsePositiveId(taskTargetId, "TASK_TARGET_ID_INVALID");
+        TaskTargetEntity target = targets.findById(parsedTargetId)
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TASK_TARGET_NOT_FOUND", "Цель задания не найдена"));
+        TaskEntity task = tasks.findById(target.getTaskId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "TASK_TARGET_NOT_FOUND", "Цель задания не найдена"));
+        if (!"ACTIVE".equals(task.getStatus())
+                || !"REVIEW".equals(task.getActivityType())
+                || task.getAssignedUserId() == null
+                || !task.getAssignedUserId().equals(userId)
+                || !"OBSTACLE_FEATURE".equals(target.getTargetType())
+                || "UNAVAILABLE".equals(target.getStatus())) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "TASK_TARGET_NOT_FOUND", "Цель задания не найдена");
+        }
+        return target.getTargetId();
     }
 
     @Transactional
@@ -258,7 +278,6 @@ public class TaskService {
 
     private List<ObstacleFeatureEntity> findReplacementReviewFeatures(Long userId, double latitude, double longitude, Set<Long> excludedFeatureIds, int count) {
         Set<Long> excluded = new HashSet<>(excludedFeatureIds);
-        excluded.addAll(activePersonalTargetIds(userId, "REVIEW", "OBSTACLE_FEATURE"));
         List<ObstacleFeatureEntity> result = new ArrayList<>();
         for (ObstacleFeatureEntity feature : features.findLowReviewedByBbox(latitude - 0.06, latitude + 0.06, longitude - 0.1, longitude + 0.1, MAX_REVIEW_COUNT_FOR_TASK)) {
             if (feature.getId() == null || excluded.contains(feature.getId())) continue;
@@ -353,7 +372,6 @@ public class TaskService {
 
     private List<HelpRequestEntity> findReplacementHelpRequests(Long volunteerId, double latitude, double longitude, Set<Long> excludedRequestIds, Set<LocalDateTime> usedStarts, int count) {
         Set<Long> excluded = new HashSet<>(excludedRequestIds);
-        excluded.addAll(activePersonalTargetIds(volunteerId, "VOLUNTEER", "HELP_REQUEST"));
         Set<LocalDateTime> starts = new HashSet<>(usedStarts);
         List<HelpRequestEntity> result = new ArrayList<>();
         for (HelpRequestEntity request : helpRequests.findByStatusOrderByDateAscTimeAscCreatedAtAsc("OPEN")) {
@@ -473,6 +491,16 @@ public class TaskService {
                 : users.findByPhoneHash(phoneHash);
         return result.filter(UserEntity::isActive)
                 .orElseThrow(() -> new ApiException(HttpStatus.UNAUTHORIZED, "USER_PHONE_NOT_FOUND", "User with given phone not found"));
+    }
+
+    private long parsePositiveId(String raw, String code) {
+        try {
+            long value = Long.parseLong(raw);
+            if (value <= 0) throw new NumberFormatException();
+            return value;
+        } catch (NumberFormatException e) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, code, "Id is invalid");
+        }
     }
 
     private static int safe(Integer value) {
