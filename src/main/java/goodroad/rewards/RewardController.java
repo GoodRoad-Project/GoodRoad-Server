@@ -2,6 +2,7 @@ package goodroad.rewards;
 
 import lombok.RequiredArgsConstructor;
 import goodroad.points.PointLedgerService;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -51,6 +52,12 @@ public class RewardController {
     @PostMapping("/me/{purchaseId}/redeem")
     public RewardService.UserRewardView redeem(Authentication authentication, @PathVariable String purchaseId) {
         return service.redeem(authentication.getName(), purchaseId);
+    }
+
+    @DeleteMapping("/me/{purchaseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUserReward(Authentication authentication, @PathVariable String purchaseId) {
+        service.deleteUserReward(authentication.getName(), purchaseId);
     }
 
     @PostMapping("/admin/offers/{offerId}/inventory")

@@ -189,9 +189,15 @@ class TasksRewardsHttpApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.balanceAfter").value(300));
 
+        mvc.perform(delete("/rewards/me/50")
+                        .principal(principal("+79990000001")))
+                .andExpect(status().isNoContent());
+
         mvc.perform(get("/rewards/leaderboard"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].lifetimePoints").value(900));
+
+        verify(rewardService).deleteUserReward("+79990000001", "50");
     }
 
     private Principal principal(String phone) {

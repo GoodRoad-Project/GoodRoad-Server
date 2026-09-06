@@ -154,6 +154,25 @@ class RewardServiceTest {
         verify(purchases).save(expired);
     }
 
+    @Test
+    void deletesOwnedRewardAndCancelsInventoryItem() {
+        UserEntity user = user(10L, 500);
+        UserRewardPurchaseEntity purchase = purchase(
+                101L, 10L, 1L, 51L, "ACTIVE", Instant.now().plusSeconds(3600)
+        );
+        RewardInventoryItemEntity item = item(51L, 1L, "DELETE-CODE");
+        item.setStatus("ASSIGNED");
+        when(users.findByPhoneHashForUpdate(any())).thenReturn(Optional.of(user));
+        when(purchases.findByIdAndUserIdForUpdate(101L, 10L)).thenReturn(Optional.of(purchase));
+        when(inventory.findById(51L)).thenReturn(Optional.of(item));
+
+        service.deleteUserReward("+79990000001", "101");
+
+        assertEquals("CANCELLED", item.getStatus());
+        verify(inventory).save(item);
+        verify(purchases).delete(purchase);
+    }
+
     private RewardOfferEntity offer(Long id, String partner, String title, int price) {
         RewardOfferEntity offer = new RewardOfferEntity();
         offer.setId(id);

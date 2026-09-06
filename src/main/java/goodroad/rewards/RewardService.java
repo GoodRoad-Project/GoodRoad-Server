@@ -151,6 +151,19 @@ public class RewardService {
     }
 
     @Transactional
+    public void deleteUserReward(String phoneFromAuth, String purchaseId) {
+        UserEntity user = findCurrent(phoneFromAuth, true);
+        long parsedId = parseId(purchaseId, "USER_REWARD_ID_INVALID");
+        UserRewardPurchaseEntity purchase = purchases.findByIdAndUserIdForUpdate(parsedId, user.getId())
+                .orElseThrow(() -> new ApiException(HttpStatus.NOT_FOUND, "USER_REWARD_NOT_FOUND", "Купленная награда не найдена"));
+        RewardInventoryItemEntity item = inventory.findById(purchase.getInventoryItemId())
+                .orElseThrow(() -> new ApiException(HttpStatus.CONFLICT, "USER_REWARD_INVENTORY_NOT_FOUND", "Код награды не найден"));
+        item.setStatus("CANCELLED");
+        inventory.save(item);
+        purchases.delete(purchase);
+    }
+
+    @Transactional
     @CacheEvict(cacheNames = CacheConfig.REWARD_OFFERS, allEntries = true)
     public InventoryCreatedResp addInventory(String offerId, List<InventoryItemReq> requests) {
         long parsedOfferId = parseId(offerId, "REWARD_ID_INVALID");
