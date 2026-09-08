@@ -1,255 +1,281 @@
 package goodroad.service;
 
-import goodroad.model.ObstacleResponse;
+import com.graphhopper.ResponsePath;
+import com.graphhopper.util.CustomModel;
+import com.graphhopper.util.shapes.GHPoint;
+import goodroad.model.PathResponse;
+import goodroad.model.ResponseInfo;
 import goodroad.model.RouteRequest;
 import goodroad.model.RouteResponse;
-import goodroad.model.PathResponse;
-import goodroad.model.gh.Path;
 import goodroad.obstacle.ObstacleDBService;
+import goodroad.model.ObstacleForRouting;
+import goodroad.routing.CustomModelFactory;
+import goodroad.routing.RoutingBoundingBox;
 import org.springframework.stereotype.Service;
-import goodroad.model.gh.*;
 
-import java.util.*;
-import java.util.concurrent.CompletableFuture;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class RouteService {
 
-    private final GraphHopperService graphHopperService;
+    private static final Logger log = LoggerFactory.getLogger(RouteService.class);
+
+    private static final double BBOX_PADDING_DEGREES = 0.01;
+
+    private final EmbeddedGraphHopperService graphHopperService;
+
+    private final CustomModelFactory customModelFactory;
+
     private final ObstacleDBService obstacleDBService;
 
-    public RouteService(GraphHopperService graphHopperService, ObstacleDBService obstacleDBService) {
+    public RouteService(
+            EmbeddedGraphHopperService graphHopperService,
+            CustomModelFactory customModelFactory,
+            ObstacleDBService obstacleDBService
+    ) {
         this.graphHopperService = graphHopperService;
+        this.customModelFactory = customModelFactory;
         this.obstacleDBService = obstacleDBService;
     }
 
-    private List<ObstacleDBService.ObstacleMapItemResp> getObstacleInArea(String start, String end) {
-        String[] startParts = start.split(",");
-        String[] endParts = end.split(",");
-
-        double startLat = Double.parseDouble(startParts[0]);
-        double startLon = Double.parseDouble(startParts[1]);
-        double endLat = Double.parseDouble(endParts[0]);
-        double endLon = Double.parseDouble(endParts[1]);
-
-        double minLat = Math.min(startLat, endLat) - 0.01;
-        double maxLat = Math.max(startLat, endLat) + 0.01;
-        double minLon = Math.min(startLon, endLon) - 0.01;
-        double maxLon = Math.max(startLon, endLon) + 0.01;
-
-        return obstacleDBService.listInBox(minLat, maxLat, minLon, maxLon);
-    }
-
-    private List<RouteRequest.RouteObstaclePolicy> getRouteObstaclePolicies(RouteRequest request) {
-        return request.getObstaclePolicies() != null ? request.getObstaclePolicies() : new ArrayList<>();
-    }
-
-    private RouteRequest.RouteObstaclePolicy policy(String obstacleType, Short maxAllowedSeverity) {
-        RouteRequest.RouteObstaclePolicy policy = new RouteRequest.RouteObstaclePolicy();
-        policy.setObstacleType(obstacleType);
-        policy.setMaxAllowedSeverity(maxAllowedSeverity);
-        return policy;
-    }
-
-    private boolean shouldAvoidForUser(
-            ObstacleDBService.ObstacleMapItemResp obstacle,
-            RouteRequest.RouteObstaclePolicy policy
-    ) {
-        if (policy.getObstacleType() == null || policy.getMaxAllowedSeverity() == null) {
-            return false;
-        }
-
-        Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
-        if (severityMap == null) {
-            return false;
-        }
-
-        Short obstacleSeverity = obstacle.obstacleSeverityEstimates().get(policy.getObstacleType());
-        if (obstacleSeverity == null) {
-            return false;
-        }
-
-        return obstacleSeverity > policy.getMaxAllowedSeverity();
-    }
-
-    private List<ObstacleDBService.ObstacleMapItemResp> getAvoidedObstacles(
-            List<ObstacleDBService.ObstacleMapItemResp> obstacles,
+    public RouteResponse buildThreeRoutes(
             RouteRequest request
     ) {
-        List<RouteRequest.RouteObstaclePolicy> policies = getRouteObstaclePolicies(request);
-        if (policies.isEmpty()) {
-            return List.of();
-        }
 
-        List<ObstacleDBService.ObstacleMapItemResp> out = new ArrayList<>();
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
-            for (RouteRequest.RouteObstaclePolicy policy : policies) {
-                if (shouldAvoidForUser(obstacle, policy)) {
-                    out.add(obstacle);
-                    break;
-                }
-            }
-        }
-        return out;
-    }
+        log.info("Building route: start={}, end={}",
+                request.getStart(), request.getEnd());
 
-    private Map<String, Object> buildModelWithObstacles(List<ObstacleDBService.ObstacleMapItemResp> obstacles, RouteRequest request) {
-        List<Map<String, Object>> conditions = new ArrayList<>();
+        long startTime = System.nanoTime();
 
-        Map<String, Short> maxAllowedMap = new HashMap<>();
-        if (request.getObstaclePolicies() != null) {
-            for (RouteRequest.RouteObstaclePolicy policy : request.getObstaclePolicies()) {
-                maxAllowedMap.put(policy.getObstacleType(), policy.getMaxAllowedSeverity());
-            }
-        }
+        log.info("Parsing start and end points");
+        GHPoint start =
+                parsePoint(request.getStart());
 
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
-            Short maxAllowed = maxAllowedMap.get(obstacle.type());
-            switch (obstacle.type()) {
-                case "STAIRS":
-                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
-                        Short severity = obstacle.obstacleSeverityEstimates().get("STAIRS");
-                        if (severity != null && severity > maxAllowed) {
-                            conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
-                        }
-                    }
-                    break;
-                case "POTHOLES":
-                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
-                        Short severity = obstacle.obstacleSeverityEstimates().get("POTHOLES");
-                        if (severity != null && severity > maxAllowed) {
-                            conditions.add(Map.of("if", "surface == POTHOLES", "multiply_by", "0"));
-                        }
-                    }
-                    break;
-                case "ROAD_SLOPE":
-                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
-                        Short severity = obstacle.obstacleSeverityEstimates().get("ROAD_SLOPE");
-                        if (severity != null && severity > maxAllowed) {
-                            conditions.add(Map.of("if", "max_slope > 0", "multiply_by", "0"));
-                        }
-                    }
-                    break;
-                case "SAND":
-                case "GRAVEL":
-                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
-                        Short severity = obstacle.obstacleSeverityEstimates().get(obstacle.type());
-                        if (severity != null && severity > maxAllowed) {
-                            conditions.add(Map.of("if", "surface == " + obstacle.type(), "multiply_by", "0"));
-                        }
-                    }
-                    break;
-                case "CURB":
-                    if (maxAllowed != null && obstacle.obstacleSeverityEstimates() != null) {
-                        Short severity = obstacle.obstacleSeverityEstimates().get("CURB");
-                        if (severity != null && severity > maxAllowed) {
-                            conditions.add(Map.of("if", "barrier == KERB", "multiply_by", "0"));
-                        }
-                    }
-                    break;
-            }
-        }
+        GHPoint end =
+                parsePoint(request.getEnd());
+        log.info("Points parsed: start={}, end={}", start, end);
 
-        if (!conditions.isEmpty()) {
-            return Map.of("priority", conditions);
-        }
-        return null;
-    }
+        Locale locale =
+                parseLocale(request.getLocale());
+        log.info("Locale: {}", locale);
 
-    private Map<String, Object> buildModelWithoutObstacles(List<ObstacleDBService.ObstacleMapItemResp> avoidObstacles, RouteRequest request) {
-        List<Map<String, Object>> conditions = new ArrayList<>();
+        log.info("Calculating bounding box");
+        RoutingBoundingBox bbox =
+                RoutingBoundingBox.around(
+                        start.getLat(),
+                        start.getLon(),
+                        end.getLat(),
+                        end.getLon(),
+                        BBOX_PADDING_DEGREES
+                );
+        log.info("Bounding box: minLat={}, maxLat={}, minLon={}, maxLon={}",
+                bbox.minLat(), bbox.maxLat(), bbox.minLon(), bbox.maxLon());
 
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : avoidObstacles) {
-            switch (obstacle.type()) {
-                case "STAIRS":
-                    conditions.add(Map.of("if", "road_class == STEPS", "multiply_by", "0"));
-                    break;
-                case "POTHOLES":
-                    conditions.add(Map.of("if", "surface == POTHOLES", "multiply_by", "0"));
-                    break;
-                case "ROAD_SLOPE":
-                    conditions.add(Map.of("if", "max_slope > 0", "multiply_by", "0")); // любой уклон
-                    break;
-                case "SAND":
-                case "GRAVEL":
-                    conditions.add(Map.of("if", "surface == " + obstacle.type(), "multiply_by", "0"));
-                    break;
-                case "CURB":
-                    conditions.add(Map.of("if", "barrier == KERB", "multiply_by", "0"));
-                    break;
-            }
-        }
 
-        return conditions.isEmpty() ? null : Map.of("priority", conditions);
-    }
+        log.info("Fetching obstacles from database");
+        List<ObstacleForRouting> obstacles =
+                obstacleDBService.findForRouting(
+                        bbox.minLat(),
+                        bbox.maxLat(),
+                        bbox.minLon(),
+                        bbox.maxLon()
+                );
 
-    public RouteResponse buildThreeRoutes(RouteRequest request) {
-        List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(request.getStart(), request.getEnd());
-        List<ObstacleDBService.ObstacleMapItemResp> avoidedObstacles = getAvoidedObstacles(obstacles, request);
+        log.info("Found {} obstacles for routing", obstacles.size());
 
-        Map<String, Object> fastModel = null;
-        Map<String, Object> balancedModel = buildModelWithObstacles(avoidedObstacles, request);
-        Map<String, Object> safeModel = buildModelWithoutObstacles(avoidedObstacles, request);
+        log.info("Building fast model");
+        CustomModel fastModel = customModelFactory.buildFast();
+        log.info("Fast model built");
 
-        CompletableFuture<GraphHopperResponse> fastFuture = CompletableFuture.supplyAsync(() ->
-                graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", fastModel)
+        log.info("Building balanced model with {} obstacles", obstacles.size());
+        CustomModel balancedModel = customModelFactory.buildBalanced(
+                obstacles,
+                request
         );
-        CompletableFuture<GraphHopperResponse> balancedFuture = CompletableFuture.supplyAsync(() ->
-                graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", balancedModel)
+        log.info("Balanced model built");
+
+        log.info("Building safe model with {} obstacles", obstacles.size());
+        CustomModel safeModel = customModelFactory.buildSafe(
+                obstacles,
+                request
         );
-        CompletableFuture<GraphHopperResponse> safeFuture = CompletableFuture.supplyAsync(() ->
-                graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", safeModel)
+        log.info("Safe model built");
+
+        log.info("Calling GraphHopper for FAST route");
+        ResponsePath fastPath = graphHopperService.route(
+                start,
+                end,
+                fastModel,
+                locale
         );
+        log.info("FAST route completed: distance={}, time={}ms",
+                fastPath.getDistance(), fastPath.getTime());
 
-        CompletableFuture.allOf(fastFuture, balancedFuture, safeFuture).join();
+        log.info("Calling GraphHopper for BALANCED route");
+        ResponsePath balancedPath = graphHopperService.route(
+                start,
+                end,
+                balancedModel,
+                locale
+        );
+        log.info("BALANCED route completed: distance={}, time={}ms",
+                balancedPath.getDistance(), balancedPath.getTime());
 
-        GraphHopperResponse fastResponse = fastFuture.join();
-        GraphHopperResponse balancedResponse = balancedFuture.join();
-        GraphHopperResponse safeResponse = safeFuture.join();
+        log.info("Calling GraphHopper for SAFE route");
+        ResponsePath safePath = graphHopperService.route(
+                start,
+                end,
+                safeModel,
+                locale
+        );
+        log.info("SAFE route completed: distance={}, time={}ms",
+                safePath.getDistance(), safePath.getTime());
 
-        Path fastPath = fastResponse != null && fastResponse.getPaths() != null && !fastResponse.getPaths().isEmpty()
-                ? fastResponse.getPaths().get(0) : null;
-        Path balancedPath = balancedResponse != null && balancedResponse.getPaths() != null && !balancedResponse.getPaths().isEmpty()
-                ? balancedResponse.getPaths().get(0) : null;
-        Path safePath = safeResponse != null && safeResponse.getPaths() != null && !safeResponse.getPaths().isEmpty()
-                ? safeResponse.getPaths().get(0) : null;
+        log.info("Converting paths to response");
+        List<PathResponse> paths =
+                List.of(
+                        toPathResponse(fastPath, "fast"),
+                        toPathResponse(balancedPath, "balanced"),
+                        toPathResponse(safePath, "safe")
+                );
 
-        List<PathResponse> paths = new ArrayList<>();
-        if (fastPath != null) paths.add(toPathResponse(fastPath, "fast", request.getStart(), request.getEnd()));
-        if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced", request.getStart(), request.getEnd()));
-        if (safePath != null) paths.add(toPathResponse(safePath, "safe", request.getStart(), request.getEnd()));
+        double took = (System.nanoTime() - startTime) / 1_000_000.0;
+        log.info("Total route building time: {} ms", took);
 
-        return new RouteResponse(UUID.randomUUID().toString(), paths, null);
+        return new RouteResponse(
+                UUID.randomUUID().toString(),
+                paths,
+                new ResponseInfo(took)
+        );
     }
 
-    private PathResponse toPathResponse(Path ghPath, String routeType, String start, String end) {
-        PathResponse response = new PathResponse();
-        response.setDistance(ghPath.getDistance());
-        response.setTime(ghPath.getTime());
-        response.setPoints(ghPath.getPoints());
-        response.setPointsEncoded(true);
-        response.setRouteType(routeType);
-
-        List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(start, end);
-
-        List<ObstacleResponse> obstacleResponses = new ArrayList<>();
-        for (ObstacleDBService.ObstacleMapItemResp obstacle : obstacles) {
-            ObstacleResponse obs = new ObstacleResponse();
-            obs.setId(obstacle.id());
-            obs.setLatitude(obstacle.latitude());
-            obs.setLongitude(obstacle.longitude());
-            obs.setType(obstacle.type());
-
-            Map<String, Short> severityMap = obstacle.obstacleSeverityEstimates();
-            if (severityMap != null && severityMap.containsKey(obstacle.type())) {
-                obs.setSeverity(severityMap.get(obstacle.type()));
-            }
-
-            obstacleResponses.add(obs);
+    private PathResponse toPathResponse(
+            ResponsePath path,
+            String routeType
+    ) {
+        log.info("Converting {} route to PathResponse", routeType);
+        if (path == null) {
+            log.error("Path is null for route type: {}", routeType);
+            throw new RuntimeException("Path is null for " + routeType);
         }
 
-        response.setObstacles(obstacleResponses);
+        String geojson = toGeoJson(path);
+        log.info("{} route converted: distance={}, time={}ms",
+                routeType, path.getDistance(), path.getTime());
 
-        return response;
+        return new PathResponse(
+                path.getDistance(),
+                path.getTime(),
+                true,
+                geojson,
+                List.of(),
+                routeType
+        );
+    }
+
+    private String toGeoJson(
+            ResponsePath path
+    ) {
+        log.info("Converting path to GeoJSON");
+
+        var points = path.getPoints();
+        if (points == null || points.size() == 0) {
+            log.error("Points are null or empty");
+            throw new RuntimeException("No points in path");
+        }
+        log.info("Path has {} points", points.size());
+
+        StringBuilder coordinates = new StringBuilder("[");
+        for (int i = 0; i < points.size(); i++) {
+            if (i > 0) {
+                coordinates.append(",");
+            }
+            coordinates
+                    .append("[")
+                    .append(points.getLon(i))
+                    .append(",")
+                    .append(points.getLat(i))
+                    .append("]");
+        }
+        coordinates.append("]");
+
+        String result = """
+            {
+              "type": "LineString",
+              "coordinates": %s
+            }
+            """
+                .formatted(coordinates);
+
+        log.info("GeoJSON converted successfully");
+        return result;
+    }
+
+    private GHPoint parsePoint(
+            String value
+    ) {
+
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Point is empty"
+            );
+        }
+
+        String[] parts =
+                value.trim().split(",");
+
+        if (parts.length != 2) {
+            throw new IllegalArgumentException(
+                    "Point must be in format: lat,lon"
+            );
+        }
+
+        try {
+
+            double lat = Double.parseDouble(parts[0].trim());
+
+            double lon = Double.parseDouble(parts[1].trim());
+
+            if (lat < -90 || lat > 90) {
+                throw new IllegalArgumentException(
+                        "Latitude must be between -90 and 90"
+                );
+            }
+
+            if (lon < -180 || lon > 180) {
+                throw new IllegalArgumentException(
+                        "Longitude must be between -180 and 180"
+                );
+            }
+
+            return new GHPoint(lat, lon);
+
+        } catch (NumberFormatException e) {
+
+            throw new IllegalArgumentException(
+                    "Invalid coordinates: " + value,
+                    e
+            );
+        }
+    }
+
+    private Locale parseLocale(
+            String locale
+    ) {
+
+        if (locale == null
+                || locale.isBlank()) {
+
+            return Locale.forLanguageTag("ru");
+        }
+
+        return Locale.forLanguageTag(locale);
     }
 }
