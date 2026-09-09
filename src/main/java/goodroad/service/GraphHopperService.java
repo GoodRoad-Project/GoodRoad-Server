@@ -1,7 +1,9 @@
 package goodroad.service;
 
+import goodroad.api.ApiErrors.ApiException;
 import goodroad.config.CacheConfig;
 import goodroad.model.gh.GraphHopperResponse;
+import goodroad.validation.GeoUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.cache.annotation.Cacheable;
@@ -11,12 +13,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.http.HttpMethod;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import java.security.cert.X509Certificate;
+import org.springframework.http.HttpStatus;
 
 import java.util.HashMap;
 import java.util.List;
@@ -24,24 +23,6 @@ import java.util.Map;
 
 @Component
 public class GraphHopperService {
-
-    static {
-        HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
-        try {
-            TrustManager[] trustAllCerts = new TrustManager[]{
-                    new X509TrustManager() {
-                        public java.security.cert.X509Certificate[] getAcceptedIssuers() { return null; }
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-                    }
-            };
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
     private final String apiKey;
     private final String baseUrl;
     private final WebClient webClient;
@@ -50,6 +31,9 @@ public class GraphHopperService {
             @Value("${graphhopper.api.key}") String apiKey,
             @Value("${graphhopper.api.url:https://graphhopper.com/api/1}") String baseUrl
     ) {
+        if (apiKey == null || apiKey.isBlank()) {
+            throw new IllegalArgumentException("graphhopper.api.key must be configured");
+        }
         this.apiKey = apiKey;
         this.baseUrl = baseUrl;
         this.webClient = WebClient.builder()
@@ -67,26 +51,18 @@ public class GraphHopperService {
             String locale,
             Map<String, Object> customModel
     ) {
-        System.out.println("=== GRAPHHOPPER SERVICE CALLED ===");
-        System.out.println("start: '" + start + "'");
-        System.out.println("end: '" + end + "'");
-        System.out.println("profile: " + profile);
-        System.out.println("pointsEncoded: " + pointsEncoded);
-        System.out.println("locale: " + locale);
-        System.out.println("customModel: " + customModel);
-
         if (profile == null) profile = "foot";
         if (pointsEncoded == null) pointsEncoded = true;
         if (locale == null) locale = "ru";
 
-        try {
-            String[] startPart = start.split(",");
-            String[] endPart = end.split(",");
+        GeoUtils.Coordinates startPoint = GeoUtils.parseLatLon(start, "start");
+        GeoUtils.Coordinates endPoint = GeoUtils.parseLatLon(end, "end");
 
+        try {
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("points", List.of(
-                    List.of(Double.parseDouble(startPart[1]), Double.parseDouble(startPart[0])),
-                    List.of(Double.parseDouble(endPart[1]), Double.parseDouble(endPart[0]))
+                    List.of(startPoint.longitude(), startPoint.latitude()),
+                    List.of(endPoint.longitude(), endPoint.latitude())
             ));
             requestBody.put("profile", profile);
             requestBody.put("points_encoded", pointsEncoded);
@@ -100,17 +76,23 @@ public class GraphHopperService {
             headers.setContentType(MediaType.APPLICATION_JSON);
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
-            String url = baseUrl + "/route?key=" + apiKey;
+            String url = baseUrl + "/route?key=" + apiKey + "&locale=" + locale;
             ResponseEntity<GraphHopperResponse> response = rest.exchange(
                     url, HttpMethod.POST, entity, GraphHopperResponse.class
             );
 
-            return response.getBody();
+            GraphHopperResponse body = response.getBody();
+            if (body == null) {
+                throw new ApiException(HttpStatus.BAD_GATEWAY, "ROUTING_PROVIDER_EMPTY_RESPONSE", "Routing provider returned an empty response");
+            }
+            return body;
 
-        } catch (Exception e) {
-            System.out.println("GraphHopper error: " + e.getMessage());
-            e.printStackTrace();
-            return null;
+        } catch (ApiException e) {
+            throw e;
+        } catch (HttpStatusCodeException e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "ROUTING_PROVIDER_ERROR", "Routing provider rejected the request");
+        } catch (RuntimeException e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "ROUTING_PROVIDER_UNAVAILABLE", "Routing provider is unavailable");
         }
     }
 

@@ -1,16 +1,20 @@
 package goodroad.service;
 
+import goodroad.api.ApiErrors.ApiException;
 import goodroad.model.ObstacleResponse;
 import goodroad.model.RouteRequest;
 import goodroad.model.RouteResponse;
 import goodroad.model.PathResponse;
 import goodroad.model.gh.Path;
 import goodroad.obstacle.ObstacleDBService;
+import goodroad.validation.GeoUtils;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import goodroad.model.gh.*;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class RouteService {
@@ -24,13 +28,13 @@ public class RouteService {
     }
 
     private List<ObstacleDBService.ObstacleMapItemResp> getObstacleInArea(String start, String end) {
-        String[] startParts = start.split(",");
-        String[] endParts = end.split(",");
+        GeoUtils.Coordinates startPoint = GeoUtils.parseLatLon(start, "start");
+        GeoUtils.Coordinates endPoint = GeoUtils.parseLatLon(end, "end");
 
-        double startLat = Double.parseDouble(startParts[0]);
-        double startLon = Double.parseDouble(startParts[1]);
-        double endLat = Double.parseDouble(endParts[0]);
-        double endLon = Double.parseDouble(endParts[1]);
+        double startLat = startPoint.latitude();
+        double startLon = startPoint.longitude();
+        double endLat = endPoint.latitude();
+        double endLon = endPoint.longitude();
 
         double minLat = Math.min(startLat, endLat) - 0.01;
         double maxLat = Math.max(startLat, endLat) + 0.01;
@@ -184,6 +188,7 @@ public class RouteService {
     }
 
     public RouteResponse buildThreeRoutes(RouteRequest request) {
+        validateRequest(request);
         List<ObstacleDBService.ObstacleMapItemResp> obstacles = getObstacleInArea(request.getStart(), request.getEnd());
         List<ObstacleDBService.ObstacleMapItemResp> avoidedObstacles = getAvoidedObstacles(obstacles, request);
 
@@ -201,7 +206,14 @@ public class RouteService {
                 graphHopperService.getRoute(request.getStart(), request.getEnd(), "foot", true, "ru", safeModel)
         );
 
-        CompletableFuture.allOf(fastFuture, balancedFuture, safeFuture).join();
+        try {
+            CompletableFuture.allOf(fastFuture, balancedFuture, safeFuture).join();
+        } catch (CompletionException e) {
+            if (e.getCause() instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw e;
+        }
 
         GraphHopperResponse fastResponse = fastFuture.join();
         GraphHopperResponse balancedResponse = balancedFuture.join();
@@ -219,7 +231,36 @@ public class RouteService {
         if (balancedPath != null) paths.add(toPathResponse(balancedPath, "balanced", request.getStart(), request.getEnd()));
         if (safePath != null) paths.add(toPathResponse(safePath, "safe", request.getStart(), request.getEnd()));
 
+        if (paths.isEmpty()) {
+            throw new ApiException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "ROUTE_NOT_FOUND",
+                    "Не удалось построить доступный маршрут между указанными точками"
+            );
+        }
+
         return new RouteResponse(UUID.randomUUID().toString(), paths, null);
+    }
+
+    private void validateRequest(RouteRequest request) {
+        if (request == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTE_REQUEST_EMPTY", "Тело запроса маршрута не может быть пустым");
+        }
+        GeoUtils.parseLatLon(request.getStart(), "start");
+        GeoUtils.parseLatLon(request.getEnd(), "end");
+        if (request.getObstaclePolicies() == null) {
+            return;
+        }
+        for (RouteRequest.RouteObstaclePolicy policy : request.getObstaclePolicies()) {
+            if (policy == null) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTE_POLICY_INVALID", "Элемент списка ограничений маршрута не может быть пустым");
+            }
+            policy.setObstacleType(goodroad.model.ObstacleType.normalize(policy.getObstacleType()));
+            Short severity = policy.getMaxAllowedSeverity();
+            if (severity == null || severity < 1 || severity > 3) {
+                throw new ApiException(HttpStatus.BAD_REQUEST, "ROUTE_POLICY_SEVERITY_INVALID", "Допустимая тяжесть препятствия должна быть от 1 до 3");
+            }
+        }
     }
 
     private PathResponse toPathResponse(Path ghPath, String routeType, String start, String end) {
