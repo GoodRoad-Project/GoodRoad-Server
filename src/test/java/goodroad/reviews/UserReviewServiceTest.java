@@ -8,6 +8,7 @@ import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.TrustedUrlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,9 @@ class UserReviewServiceTest {
 
     @Mock
     private UserRepo users;
+
+    @Mock
+    private TrustedUrlService trustedUrls;
 
     @Mock
     private ObstacleFeatureRepo features;
@@ -49,7 +53,9 @@ class UserReviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        ReviewValidationService validator = new ReviewValidationService();
+        lenient().when(trustedUrls.requireOwnedStorageUrl(anyString(), eq("reviews"), anyLong(), eq("REVIEW_PHOTO_URL_INVALID")))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        ReviewValidationService validator = new ReviewValidationService(trustedUrls);
         ReviewFeatureService featureService = new ReviewFeatureService(features);
         ReviewMapper mapper = new ReviewMapper(reviewSupport, photos, reviewObstacles);
 
