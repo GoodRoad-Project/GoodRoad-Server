@@ -4,6 +4,7 @@ import goodroad.api.ApiErrors.ApiException;
 import goodroad.obstacle.repository.ObstacleFeatureEntity;
 import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
+import goodroad.tasks.TaskService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
 import goodroad.reviews.repository.ObstacleReviewEntity;
@@ -30,6 +31,7 @@ public class UserReviewService {
     private final StorageService storageService;
     private final ReviewValidationService validator;
     private final ReviewFeatureService featureService;
+    private final TaskService taskService;
     private final ReviewMapper mapper;
 
     public UserReviewService(
@@ -39,6 +41,7 @@ public class UserReviewService {
             StorageService storageService,
             ReviewValidationService validator,
             ReviewFeatureService featureService,
+            TaskService taskService,
             ReviewMapper mapper
     ) {
         this.users = users;
@@ -47,6 +50,7 @@ public class UserReviewService {
         this.storageService = storageService;
         this.validator = validator;
         this.featureService = featureService;
+        this.taskService = taskService;
         this.mapper = mapper;
     }
 
@@ -72,7 +76,8 @@ public class UserReviewService {
             short rating,
             List<ObstacleSeverityItem> obstacles,
             String comment,
-            List<String> photoUrls
+            List<String> photoUrls,
+            String taskTargetId
     ) {}
 
     public record ReviewCardResp(
@@ -142,7 +147,9 @@ public class UserReviewService {
                 validator.validate(req, user.getId());
 
         ObstacleFeatureEntity feature =
-                featureService.resolveOrCreateFeature(
+                resolveFeature(
+                        user,
+                        req,
                         input
                 );
 
@@ -220,7 +227,11 @@ public class UserReviewService {
                 validator.validate(req, user.getId());
 
         ObstacleFeatureEntity feature =
-                featureService.resolveOrCreateFeature(input);
+                resolveFeature(
+                        user,
+                        req,
+                        input
+                );
 
         reviews.findByFeatureIdAndAuthorId(feature.getId(), user.getId())
                 .filter(existing -> !existing.getId().equals(review.getId()))
@@ -316,6 +327,27 @@ public class UserReviewService {
         return new ReviewPhotoUploadResp(
                 photoUrl
         );
+    }
+
+    private ObstacleFeatureEntity resolveFeature(
+            UserEntity user,
+            UpsertReviewReq req,
+            ReviewValidationService.ValidatedReviewInput input
+    ) {
+        String taskTargetId = req.taskTargetId() == null || req.taskTargetId().isBlank()
+                ? null
+                : req.taskTargetId().trim();
+
+        if (taskTargetId == null) {
+            return featureService.resolveOrCreateFeature(input);
+        }
+
+        Long featureId = taskService.resolveReviewFeatureId(
+                user.getId(),
+                taskTargetId
+        );
+
+        return featureService.findExistingFeature(featureId);
     }
 
     private UserEntity findCurrent(
