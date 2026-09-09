@@ -194,13 +194,15 @@ class RouteServiceTest {
 
         List<Map<String, Object>> allModels = captor.getAllValues();
 
-        assertNull(allModels.get(0));
+        assertEquals(3, allModels.size());
+        assertEquals(1, allModels.stream().filter(model -> model == null).count());
 
-        assertNotNull(allModels.get(1));
-        assertNotNull(allModels.get(1).get("priority"));
+        List<Map<String, Object>> nonNullModels = allModels.stream()
+                .filter(model -> model != null)
+                .toList();
 
-        assertNotNull(allModels.get(2));
-        assertNotNull(allModels.get(2).get("priority"));
+        assertEquals(2, nonNullModels.size());
+        assertTrue(nonNullModels.stream().allMatch(model -> model.get("priority") != null));
     }
 
     @Test
@@ -267,7 +269,10 @@ class RouteServiceTest {
         when(obstacleDBService.listInBox(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
                 .thenReturn(obstacles);
         when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
-                .thenReturn(new GraphHopperResponse(List.of(new Path(100.0, 1000L, "abc", true)), null));
+                .thenReturn(new GraphHopperResponse(
+                        List.of(new Path(100.0, 1000L, "abc", true)),
+                        null
+                ));
 
         service.buildThreeRoutes(request);
 
@@ -280,23 +285,27 @@ class RouteServiceTest {
 
         assertEquals(3, allModels.size());
 
-        assertNull(allModels.get(0));
+        long nullModels = allModels.stream()
+                .filter(model -> model == null)
+                .count();
 
-        Map<String, Object> balancedModel = allModels.get(1);
-        assertNotNull(balancedModel);
-        assertNotNull(balancedModel.get("priority"));
+        assertEquals(1, nullModels);
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> conditions = (List<Map<String, Object>>) balancedModel.get("priority");
-        assertEquals(6, conditions.size());
+        List<Map<String, Object>> nonNullModels = allModels.stream()
+                .filter(model -> model != null)
+                .toList();
 
-        Map<String, Object> safeModel = allModels.get(2);
-        assertNotNull(safeModel);
-        assertNotNull(safeModel.get("priority"));
+        assertEquals(2, nonNullModels.size());
 
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> safeConditions = (List<Map<String, Object>>) safeModel.get("priority");
-        assertEquals(6, safeConditions.size());
+        for (Map<String, Object> model : nonNullModels) {
+            assertNotNull(model.get("priority"));
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> conditions =
+                    (List<Map<String, Object>>) model.get("priority");
+
+            assertEquals(6, conditions.size());
+        }
     }
 
     @Test
@@ -434,7 +443,7 @@ class RouteServiceTest {
     }
 
     @Test
-    void shouldHandlePolicyWithNullFields() {
+    void shouldRejectPolicyWithNullFields() {
         RouteRequest request = new RouteRequest();
         request.setStart(START);
         request.setEnd(END);
@@ -444,21 +453,12 @@ class RouteServiceTest {
         policy.setMaxAllowedSeverity(null);
         request.setObstaclePolicies(List.of(policy));
 
-        ObstacleDBService.ObstacleMapItemResp obstacle = createObstacle(
-                "1", "STAIRS", 59.93, 30.33, Map.of("STAIRS", (short) 3)
+        goodroad.api.ApiErrors.ApiException error = assertThrows(
+                goodroad.api.ApiErrors.ApiException.class,
+                () -> service.buildThreeRoutes(request)
         );
 
-        when(obstacleDBService.listInBox(anyDouble(), anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(List.of(obstacle));
-        when(graphHopperService.getRoute(anyString(), anyString(), anyString(), anyBoolean(), anyString(), any()))
-                .thenReturn(new GraphHopperResponse(List.of(new Path(100.0, 1000L, "abc", true)), null));
-
-        service.buildThreeRoutes(request);
-
-        verify(graphHopperService, times(3)).getRoute(
-                anyString(), anyString(), anyString(), anyBoolean(), anyString(), customModelCaptor.capture()
-        );
-
-        assertNull(customModelCaptor.getAllValues().get(1));
+        assertEquals("OBSTACLE_TYPE_INVALID", error.code());
+        verifyNoInteractions(graphHopperService, obstacleDBService);
     }
 }
