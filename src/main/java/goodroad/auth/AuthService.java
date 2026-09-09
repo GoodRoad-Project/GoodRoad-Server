@@ -304,6 +304,10 @@ public class AuthService {
         users.save(user);
     }
 
+    public AuthResp issueTokens(UserEntity user, String phoneNorm) {
+        return toResp(user, phoneNorm);
+    }
+
     private AuthResp toResp(UserEntity user, String phoneNorm) {
         return new AuthResp(
                 new UserView(

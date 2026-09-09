@@ -52,8 +52,21 @@ public class UserProfileService {
             String firstName,
             String lastName,
             String photoUrl,
-            boolean active
+            boolean active,
+            String accessToken,
+            String refreshToken,
+            String tokenType
     ) {
+        public ProfileView(
+                String id,
+                String role,
+                String firstName,
+                String lastName,
+                String photoUrl,
+                boolean active
+        ) {
+            this(id, role, firstName, lastName, photoUrl, active, null, null, null);
+        }
     }
 
     public record UpdateProfileReq(
@@ -196,7 +209,19 @@ public class UserProfileService {
             user.setLastActiveAt(Instant.now());
             users.save(user);
 
-            return toView(user);
+            AuthService.AuthResp auth = authService.issueTokens(user, newPhoneNorm);
+
+            return new ProfileView(
+                    user.getId().toString(),
+                    user.getRole(),
+                    user.getFirstName(),
+                    user.getLastName(),
+                    user.getPhotoUrl(),
+                    user.isActive(),
+                    auth.accessToken(),
+                    auth.refreshToken(),
+                    auth.tokenType()
+            );
         }
         catch (Exception e) {
             log.error("Error changing phone", e);
