@@ -166,56 +166,76 @@ public class RouteService {
             throw new RuntimeException("Path is null for " + routeType);
         }
 
-        String geojson = toGeoJson(path);
-        log.info("{} route converted: distance={}, time={}ms",
-                routeType, path.getDistance(), path.getTime());
+        String encodedPolyline = toEncodedPolyline(path);
+        log.info( "{} route converted: distance={}, time={}ms, encodedLength={}",
+                routeType,
+                path.getDistance(),
+                path.getTime(),
+                encodedPolyline.length()
+        );
 
         return new PathResponse(
                 path.getDistance(),
                 path.getTime(),
                 true,
-                geojson,
+                encodedPolyline,
                 List.of(),
                 routeType
         );
     }
 
-    private String toGeoJson(
-            ResponsePath path
-    ) {
-        log.info("Converting path to GeoJSON");
-
+    private String toEncodedPolyline(ResponsePath path) {
+        log.info("Encoding path to Google Encoded Polyline");
         var points = path.getPoints();
+
         if (points == null || points.size() == 0) {
             log.error("Points are null or empty");
+
             throw new RuntimeException("No points in path");
         }
-        log.info("Path has {} points", points.size());
 
-        StringBuilder coordinates = new StringBuilder("[");
+        log.info("Encoding {} points", points.size());
+
+        StringBuilder result = new StringBuilder();
+
+        long previousLat = 0;
+        long previousLon = 0;
+
         for (int i = 0; i < points.size(); i++) {
-            if (i > 0) {
-                coordinates.append(",");
-            }
-            coordinates
-                    .append("[")
-                    .append(points.getLon(i))
-                    .append(",")
-                    .append(points.getLat(i))
-                    .append("]");
+
+            double latitude = points.getLat(i);
+            double longitude = points.getLon(i);
+
+            long lat = Math.round(latitude * 1e5);
+            long lon = Math.round(longitude * 1e5);
+
+            long deltaLat = lat - previousLat;
+            long deltaLon = lon - previousLon;
+
+            encodeValue(deltaLat, result);
+            encodeValue( deltaLon, result );
+
+            previousLat = lat;
+            previousLon = lon;
+
         }
-        coordinates.append("]");
 
-        String result = """
-            {
-              "type": "LineString",
-              "coordinates": %s
-            }
-            """
-                .formatted(coordinates);
+        log.info( "Google Encoded Polyline created, length={}", result.length());
 
-        log.info("GeoJSON converted successfully");
-        return result;
+        return result.toString();
+    }
+
+    private void encodeValue(long value, StringBuilder result) {
+
+        long encoded = value < 0 ? ~(value << 1) : (value << 1);
+
+        while (encoded >= 0x20) {
+
+            long next = (0x20 | (encoded & 0x1f)) + 63;
+            result.append( (char) next ); encoded >>= 5;
+        }
+
+        result.append((char) (encoded + 63));
     }
 
     private GHPoint parsePoint(
