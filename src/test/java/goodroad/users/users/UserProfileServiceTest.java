@@ -76,6 +76,13 @@ class UserProfileServiceTest {
         when(users.findByPhoneHashForUpdate(anyString())).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("pass", "hash")).thenReturn(true);
         when(users.findByPhoneHash(anyString())).thenReturn(Optional.empty());
+        when(authService.issueTokens(user, "79990000002"))
+                .thenReturn(new AuthService.AuthResp(
+                        new AuthService.UserView("1", Role.USER.name()),
+                        "new-access-token",
+                        "new-refresh-token",
+                        "Bearer"
+                ));
 
         UserProfileService.ChangePhoneReq req = new UserProfileService.ChangePhoneReq(
                 "+79990000002", "pass"
@@ -84,7 +91,11 @@ class UserProfileServiceTest {
         UserProfileService.ProfileView view = service.changePhone("+79990000001", req);
 
         assertNotNull(view);
+        assertEquals("new-access-token", view.accessToken());
+        assertEquals("new-refresh-token", view.refreshToken());
+        assertEquals("Bearer", view.tokenType());
         verify(users).save(user);
+        verify(authService).issueTokens(user, "79990000002");
     }
 
     @Test
