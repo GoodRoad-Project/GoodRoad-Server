@@ -202,8 +202,7 @@ class AuthServiceTest {
     }
 
     @Test
-    void shouldRecoverPassword() {
-
+    void shouldRecoverPasswordForMatchingUserData() {
         UserEntity user = UserEntity.builder()
                 .firstName("Иван")
                 .lastName("Иванов")
@@ -212,21 +211,23 @@ class AuthServiceTest {
                 .active(true)
                 .build();
 
-        when(users.findByPhoneHash(anyString()))
-                .thenReturn(Optional.of(user));
+        when(users.findByPhoneHashForUpdate(anyString())).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newPassword")).thenReturn("newHash");
 
-        when(passwordEncoder.encode("new"))
-                .thenReturn("newHash");
+        authService.recoverPass(
+                "+79990001122",
+                "  иВАН  ",
+                "иванов",
+                "newPassword"
+        );
 
-        authService.recoverPass("+79990001122", "Иван", "Иванов", "new");
-
-        verify(users).save(user);
         assertEquals("newHash", user.getPassHash());
+        assertNotNull(user.getLastActiveAt());
+        verify(users).save(user);
     }
 
     @Test
-    void shouldFailRecoverPasswordForWrongName() {
-
+    void shouldRejectRecoveryForWrongName() {
         UserEntity user = UserEntity.builder()
                 .firstName("Иван")
                 .lastName("Иванов")
@@ -235,12 +236,40 @@ class AuthServiceTest {
                 .active(true)
                 .build();
 
-        when(users.findByPhoneHash(anyString()))
-                .thenReturn(Optional.of(user));
+        when(users.findByPhoneHashForUpdate(anyString())).thenReturn(Optional.of(user));
 
         assertThrows(RuntimeException.class,
-                () -> authService.recoverPass("+79990001122", "Петр", "Иванов", "new"));
+                () -> authService.recoverPass(
+                        "+79990001122",
+                        "Петр",
+                        "Иванов",
+                        "newPassword"
+                ));
 
         verify(users, never()).save(any(UserEntity.class));
     }
+
+    @Test
+    void shouldRejectRecoveryForModerator() {
+        UserEntity moderator = UserEntity.builder()
+                .firstName("Иван")
+                .lastName("Иванов")
+                .passHash("oldHash")
+                .role("MODERATOR")
+                .active(true)
+                .build();
+
+        when(users.findByPhoneHashForUpdate(anyString())).thenReturn(Optional.of(moderator));
+
+        assertThrows(RuntimeException.class,
+                () -> authService.recoverPass(
+                        "+79990001122",
+                        "Иван",
+                        "Иванов",
+                        "newPassword"
+                ));
+
+        verify(users, never()).save(any(UserEntity.class));
+    }
+
 }
