@@ -1,6 +1,7 @@
 package goodroad.obstacle;
 
 import goodroad.api.ApiErrors.ApiException;
+import goodroad.model.ObstacleForRouting;
 import goodroad.model.ReviewStatus;
 import goodroad.obstacle.repository.*;
 import goodroad.reviews.repository.*;
@@ -9,6 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Service
 public class ObstacleDBService {
@@ -166,6 +170,63 @@ public class ObstacleDBService {
                 feature.getLastReviewedAt(),
                 items
         );
+    }
+
+    public List<ObstacleForRouting> findForRouting(
+            double minLat,
+            double maxLat,
+            double minLon,
+            double maxLon
+    ) {
+
+        List<ObstacleFeatureEntity> Obstaclefeatures =
+                features.findByBboxWithReviewStatus(
+                        minLat,
+                        maxLat,
+                        minLon,
+                        maxLon,
+                        ReviewStatus.APPROVED.name()
+                );
+
+        if (Obstaclefeatures.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> featureIds = Obstaclefeatures.stream()
+                .map(ObstacleFeatureEntity::getId)
+                .toList();
+
+        List<ObstacleFeatureObstacleScoreEntity> scores =
+                obstacleScores.findByIdFeatureIdIn(featureIds);
+
+        Map<Long, Map<String, Short>> scoresByFeature =
+                new HashMap<>();
+
+        for (ObstacleFeatureObstacleScoreEntity score : scores) {
+
+            Long featureId = score.getId().getFeatureId();
+
+            scoresByFeature
+                    .computeIfAbsent(featureId, ignored -> new HashMap<>())
+                    .put(
+                            score.getId().getObstacleType(),
+                            score.getSeverityEstimate()
+                    );
+        }
+
+        return Obstaclefeatures.stream()
+                .map(feature -> new ObstacleForRouting(
+                        feature.getId(),
+                        feature.getType(),
+                        feature.getLat(),
+                        feature.getLon(),
+                        feature.getSeverityEst(),
+                        scoresByFeature.getOrDefault(
+                                feature.getId(),
+                                Map.of()
+                        )
+                ))
+                .toList();
     }
 
     private Map<Long, Map<String, Short>> loadScoresByFeature(List<Long> featureIds) {
