@@ -1,7 +1,12 @@
 package goodroad.storage;
 
+import goodroad.api.ApiErrors.ApiException;
+import goodroad.validation.UploadValidationService;
+import goodroad.validation.UploadValidationService.UploadPurpose;
+import goodroad.validation.UploadValidationService.VerifiedUpload;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -15,55 +20,58 @@ import java.util.UUID;
 public class StorageService {
 
     private final S3Client s3Client;
+    private final UploadValidationService uploadValidator;
 
     @Value("${yandex.storage.bucket}")
     private String bucket;
 
     public String uploadAvatar(MultipartFile file, String userId) {
 
+        VerifiedUpload verified = uploadValidator.validate(file, UploadPurpose.AVATAR);
+
         try {
 
-            String ext = getExt(file.getOriginalFilename());
-
-            String key = "avatars/" + userId + "/" + UUID.randomUUID() + ext;
+            String key = "avatars/" + userId + "/" + UUID.randomUUID() + verified.extension();
 
             s3Client.putObject(
                     PutObjectRequest.builder()
                             .bucket(bucket)
                             .key(key)
-                            .contentType(file.getContentType())
+                            .contentType(verified.contentType())
+                            .contentLength((long) verified.bytes().length)
                             .build(),
-                    RequestBody.fromBytes(file.getBytes())
+                    RequestBody.fromBytes(verified.bytes())
             );
 
             return "https://storage.yandexcloud.net/"
                     + bucket + "/"
                     + key;
 
-        } catch (Exception e) {
-            throw new RuntimeException("Upload failed", e);
+        } catch (RuntimeException e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "STORAGE_UNAVAILABLE", "File storage is unavailable");
         }
     }
 
     public String uploadReviewPhoto(MultipartFile file, String userId) {
 
-        try {
+        VerifiedUpload verified = uploadValidator.validate(file, UploadPurpose.REVIEW_PHOTO);
 
-            String ext = getExt(file.getOriginalFilename());
+        try {
 
             String key = "reviews/"
                     + userId
                     + "/"
                     + UUID.randomUUID()
-                    + ext;
+                    + verified.extension();
 
             s3Client.putObject(
                     PutObjectRequest.builder()
                             .bucket(bucket)
                             .key(key)
-                            .contentType(file.getContentType())
+                            .contentType(verified.contentType())
+                            .contentLength((long) verified.bytes().length)
                             .build(),
-                    RequestBody.fromBytes(file.getBytes())
+                    RequestBody.fromBytes(verified.bytes())
             );
 
             return "https://storage.yandexcloud.net/"
@@ -71,30 +79,31 @@ public class StorageService {
                     + "/"
                     + key;
 
-        } catch (Exception e) {
-            throw new RuntimeException("Upload failed", e);
+        } catch (RuntimeException e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "STORAGE_UNAVAILABLE", "File storage is unavailable");
         }
     }
 
     public String uploadVolunteerCertificate(MultipartFile file, String userId) {
 
-        try {
+        VerifiedUpload verified = uploadValidator.validate(file, UploadPurpose.VOLUNTEER_CERTIFICATE);
 
-            String ext = getExt(file.getOriginalFilename());
+        try {
 
             String key = "volunteer-certificates/"
                     + userId
                     + "/"
                     + UUID.randomUUID()
-                    + ext;
+                    + verified.extension();
 
             s3Client.putObject(
                     PutObjectRequest.builder()
                             .bucket(bucket)
                             .key(key)
-                            .contentType(file.getContentType())
+                            .contentType(verified.contentType())
+                            .contentLength((long) verified.bytes().length)
                             .build(),
-                    RequestBody.fromBytes(file.getBytes())
+                    RequestBody.fromBytes(verified.bytes())
             );
 
             return "https://storage.yandexcloud.net/"
@@ -102,14 +111,8 @@ public class StorageService {
                     + "/"
                     + key;
 
-        } catch (Exception e) {
-            throw new RuntimeException("Upload failed", e);
+        } catch (RuntimeException e) {
+            throw new ApiException(HttpStatus.BAD_GATEWAY, "STORAGE_UNAVAILABLE", "File storage is unavailable");
         }
-    }
-
-    private String getExt(String name) {
-        if (name == null) return "";
-        int i = name.lastIndexOf(".");
-        return i == -1 ? "" : name.substring(i);
     }
 }

@@ -6,8 +6,10 @@ import goodroad.obstacle.repository.ObstacleFeatureRepo;
 import goodroad.reviews.repository.*;
 import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
+import goodroad.tasks.TaskService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.TrustedUrlService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,6 +30,9 @@ class UserReviewServiceTest {
     private UserRepo users;
 
     @Mock
+    private TrustedUrlService trustedUrls;
+
+    @Mock
     private ObstacleFeatureRepo features;
 
     @Mock
@@ -45,11 +50,16 @@ class UserReviewServiceTest {
     @Mock
     private StorageService storageService;
 
+    @Mock
+    private TaskService taskService;
+
     private UserReviewService service;
 
     @BeforeEach
     void setUp() {
-        ReviewValidationService validator = new ReviewValidationService();
+        lenient().when(trustedUrls.requireOwnedStorageUrl(anyString(), eq("reviews"), anyLong(), eq("REVIEW_PHOTO_URL_INVALID")))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        ReviewValidationService validator = new ReviewValidationService(trustedUrls);
         ReviewFeatureService featureService = new ReviewFeatureService(features);
         ReviewMapper mapper = new ReviewMapper(reviewSupport, photos, reviewObstacles);
 
@@ -60,6 +70,7 @@ class UserReviewServiceTest {
                 storageService,
                 validator,
                 featureService,
+                taskService,
                 mapper
         );
     }
@@ -106,6 +117,39 @@ class UserReviewServiceTest {
                 .save(any(ObstacleReviewObstacleEntity.class));
 
         verify(photos).save(any(ObstacleReviewPhotoEntity.class));
+    }
+
+    @Test
+    void shouldCreateReviewForTaskTargetFeature() {
+        UserEntity user = user(1L);
+        ObstacleFeatureEntity feature = feature(10L);
+
+        when(users.findByPhoneHash(anyString())).thenReturn(Optional.of(user));
+        when(taskService.resolveReviewFeatureId(1L, "55")).thenReturn(10L);
+        when(features.findById(10L)).thenReturn(Optional.of(feature));
+        when(reviews.findByFeatureIdAndAuthorId(10L, 1L)).thenReturn(Optional.empty());
+        when(reviews.save(any(ObstacleReviewEntity.class))).thenAnswer(invocation -> {
+            ObstacleReviewEntity review = invocation.getArgument(0);
+            review.setId(20L);
+            return review;
+        });
+        when(reviewSupport.loadBundle(anyList())).thenReturn(bundle(feature));
+
+        UserReviewService.ReviewCardResp result =
+                service.createReview("+79990000001", request("55"));
+
+        assertEquals("10", result.featureId());
+        verify(taskService).resolveReviewFeatureId(1L, "55");
+        verify(features, never()).findByAddressAndType(
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                anyString(),
+                any()
+        );
     }
 
     @Test
@@ -171,6 +215,10 @@ class UserReviewServiceTest {
     }
 
     private UserReviewService.UpsertReviewReq request() {
+        return request(null);
+    }
+
+    private UserReviewService.UpsertReviewReq request(String taskTargetId) {
         return new UserReviewService.UpsertReviewReq(
                 59.93,
                 30.33,
@@ -186,7 +234,8 @@ class UserReviewServiceTest {
                 (short) 4,
                 List.of(new UserReviewService.ObstacleSeverityItem("STAIRS", (short) 3)),
                 "Комментарий",
-                List.of("http://photo")
+                List.of("http://photo"),
+                taskTargetId
         );
     }
 
