@@ -10,6 +10,7 @@ RUN keytool -import -trustcacerts -keystore /opt/java/openjdk/lib/security/cacer
 # Копируем файлы для сборки
 COPY build.gradle settings.gradle ./
 COPY src ./src
+COPY data/northwestern-fed-district.osm.pbf /app/data/
 
 # Сборка без тестов
 RUN gradle bootJar -x test --no-daemon
