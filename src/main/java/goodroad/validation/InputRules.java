@@ -16,7 +16,7 @@ public final class InputRules {
 
     public static String requireCyrillicText(String value, String code, String fieldName) {
         String normalized = trimToNull(value);
-        if (normalized == null || !CYRILLIC_TEXT.matcher(normalized).matches()) {
+        if (normalized == null || normalized.length() > 80 || !CYRILLIC_TEXT.matcher(normalized).matches()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, code, fieldName + " is invalid");
         }
         return normalized;

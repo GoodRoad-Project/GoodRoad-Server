@@ -10,6 +10,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 @Component
@@ -37,7 +38,11 @@ public class AdminBootstrap implements ApplicationRunner { // инициализ
     public void run(ApplicationArguments args) {
         String phoneNorm = Crypto.normPhone(adminPhone);
         if (phoneNorm.isEmpty()) {
-            return;
+            throw new IllegalStateException("app.admin.phone must contain a valid phone number");
+        }
+        if (adminPass == null || adminPass.isBlank()
+                || adminPass.getBytes(StandardCharsets.UTF_8).length > 72) {
+            throw new IllegalStateException("app.admin.pass must contain 1 to 72 bytes");
         }
 
         String phoneHash = Crypto.sha256Hex(phoneNorm);

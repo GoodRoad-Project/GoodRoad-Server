@@ -19,7 +19,7 @@ import goodroad.service.RouteService;
 import goodroad.users.moderators.ModeratorController;
 import goodroad.users.moderators.ModeratorService;
 import goodroad.users.users.UserController;
-import goodroad.users.users.UserSettingsService;
+import goodroad.users.users.UserProfileService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,7 +52,7 @@ class HttpApiScenarioTest {
     private AuthService authService;
 
     @Mock
-    private UserSettingsService userSettingsService;
+    private UserProfileService userProfileService;
 
     @Mock
     private ModeratorService moderatorService;
@@ -165,19 +165,23 @@ class HttpApiScenarioTest {
 
     @Test
     void shouldUseUserEndpoints() throws Exception {
-        MockMvc mvc = standaloneSetup(new UserController(userSettingsService)).build();
+        MockMvc mvc = standaloneSetup(new UserController(userProfileService)).build();
         setCurrentUser("+79990000001");
 
-        when(userSettingsService.getCurrentUser("+79990000001"))
-                .thenReturn(new UserSettingsService.SettingsView(
+        when(userProfileService.getCurrentUser("+79990000001"))
+                .thenReturn(new UserProfileService.ProfileView(
                         "10", "USER", "Иван", "Петров", null, true
                 ));
-        when(userSettingsService.updateCurrentUserSettings(eq("+79990000001"), any(UserSettingsService.UpdateSettingsReq.class)))
-                .thenReturn(new UserSettingsService.SettingsView(
+        when(userProfileService.updateProfile(eq("+79990000001"), any(UserProfileService.UpdateProfileReq.class)))
+                .thenReturn(new UserProfileService.ProfileView(
                         "10", "USER", "Иван", "Иванов", null, true
                 ));
-        when(userSettingsService.uploadAvatar(eq("+79990000001"), any()))
-                .thenReturn(new UserSettingsService.AvatarUploadResp("https://storage/avatar.png"));
+        when(userProfileService.changePhone(eq("+79990000001"), any(UserProfileService.ChangePhoneReq.class)))
+                .thenReturn(new UserProfileService.ProfileView(
+                        "10", "USER", "Иван", "Петров", null, true
+                ));
+        when(userProfileService.uploadAvatar(eq("+79990000001"), any()))
+                .thenReturn(new UserProfileService.AvatarUploadResp("https://storage/avatar.png"));
 
         mvc.perform(get("/users"))
                 .andExpect(status().isOk())
@@ -187,21 +191,37 @@ class HttpApiScenarioTest {
         mvc.perform(put("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "firstName": "Иван",
-                                  "lastName": "Иванов",
-                                  "photoUrl": null,
-                                  "phone": "+79990000001"
-                                }
-                                """))
+                            {
+                              "firstName": "Иван",
+                              "lastName": "Иванов",
+                              "photoUrl": null
+                            }
+                            """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lastName").value("Иванов"));
 
+        mvc.perform(put("/users/phone")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "phone": "+79990000002",
+                              "currentPassword": "123"
+                            }
+                            """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("10"));
+        verify(userProfileService).changePhone(eq("+79990000001"), any(UserProfileService.ChangePhoneReq.class));
+
         mvc.perform(post("/users")
-                        .param("oldPassword", "123")
-                        .param("newPassword", "1234"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "oldPassword": "123",
+                              "newPassword": "1234"
+                            }
+                            """))
                 .andExpect(status().isOk());
-        verify(userSettingsService).changePassword("+79990000001", "123", "1234");
+        verify(userProfileService).changePassword(eq("+79990000001"), any(UserProfileService.ChangePasswordReq.class));
 
         MockMultipartFile file = new MockMultipartFile(
                 "file", "avatar.png", "image/png", new byte[]{1, 2, 3}
@@ -213,12 +233,12 @@ class HttpApiScenarioTest {
         mvc.perform(delete("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "password": "123"
-                                }
-                                """))
+                            {
+                              "password": "123"
+                            }
+                            """))
                 .andExpect(status().isOk());
-        verify(userSettingsService).deleteCurrent(eq("+79990000001"), any(UserSettingsService.DeleteAccountReq.class));
+        verify(userProfileService).deleteCurrent(eq("+79990000001"), any(UserProfileService.DeleteAccountReq.class));
     }
 
     @Test

@@ -12,14 +12,26 @@ public class UserRewardPurchaseEntity {
     private Long userId;
     @Column(name = "reward_offer_id", nullable = false)
     private Long rewardOfferId;
+    @Column(name = "inventory_item_id", nullable = false)
+    private Long inventoryItemId;
     @Column(name = "price", nullable = false)
     private Integer price;
+    @Column(name = "status", nullable = false, length = 16)
+    private String status = "ACTIVE";
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+    @Column(name = "redeemed_at")
+    private Instant redeemedAt;
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
     @PrePersist private void prePersist(){ if(createdAt==null) createdAt=Instant.now(); }
     public Long getId(){return id;} public void setId(Long id){this.id=id;}
     public Long getUserId(){return userId;} public void setUserId(Long userId){this.userId=userId;}
     public Long getRewardOfferId(){return rewardOfferId;} public void setRewardOfferId(Long rewardOfferId){this.rewardOfferId=rewardOfferId;}
+    public Long getInventoryItemId(){return inventoryItemId;} public void setInventoryItemId(Long inventoryItemId){this.inventoryItemId=inventoryItemId;}
     public Integer getPrice(){return price;} public void setPrice(Integer price){this.price=price;}
+    public String getStatus(){return status;} public void setStatus(String status){this.status=status;}
+    public Instant getExpiresAt(){return expiresAt;} public void setExpiresAt(Instant expiresAt){this.expiresAt=expiresAt;}
+    public Instant getRedeemedAt(){return redeemedAt;} public void setRedeemedAt(Instant redeemedAt){this.redeemedAt=redeemedAt;}
     public Instant getCreatedAt(){return createdAt;} public void setCreatedAt(Instant createdAt){this.createdAt=createdAt;}
 }

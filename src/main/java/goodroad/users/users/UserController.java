@@ -9,37 +9,44 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/users")
 public class UserController {
 
-    private final UserSettingsService service;
+    private final UserProfileService service;
 
-    public UserController(UserSettingsService service) {
+    public UserController(UserProfileService service) {
         this.service = service;
     }
 
     @GetMapping("")
-    public UserSettingsService.SettingsView getCurrentUser() {
+    public UserProfileService.ProfileView getCurrentUser() {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         return service.getCurrentUser(currentUsername);
     }
 
     @PutMapping("")
-    public UserSettingsService.SettingsView updateCurrentUser(
-            @RequestBody UserSettingsService.UpdateSettingsReq req
+    public UserProfileService.ProfileView updateProfile(
+            @RequestBody UserProfileService.UpdateProfileReq req
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        return service.updateCurrentUserSettings(currentUsername, req);
+        return service.updateProfile(currentUsername, req);
+    }
+
+    @PutMapping("/phone")
+    public UserProfileService.ProfileView changePhone(
+            @RequestBody UserProfileService.ChangePhoneReq req
+    ) {
+        String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
+        return service.changePhone(currentUsername, req);
     }
 
     @PostMapping("")
     public void changePassword(
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword
+            @RequestBody UserProfileService.ChangePasswordReq req
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
-        service.changePassword(currentUsername, oldPassword, newPassword);
+        service.changePassword(currentUsername, req);
     }
 
     @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public UserSettingsService.AvatarUploadResp uploadAvatar(
+    public UserProfileService.AvatarUploadResp uploadAvatar(
             @RequestParam("file") MultipartFile file
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -48,7 +55,7 @@ public class UserController {
 
     @DeleteMapping("")
     public void deleteCurrentUser(
-            @RequestBody UserSettingsService.DeleteAccountReq req
+            @RequestBody UserProfileService.DeleteAccountReq req
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         service.deleteCurrent(currentUsername, req);
@@ -57,7 +64,7 @@ public class UserController {
     @DeleteMapping("/{id}")
     public void deleteUserByAdmin(
             @PathVariable String id,
-            @RequestBody UserSettingsService.DeleteAccountReq req
+            @RequestBody UserProfileService.DeleteAccountReq req
     ) {
         String currentUsername = SecurityContextHolder.getContext().getAuthentication().getName();
         service.deleteByAdmin(currentUsername, id, req);

@@ -5,7 +5,9 @@ import goodroad.security.Crypto;
 import goodroad.storage.StorageService;
 import goodroad.users.repository.UserEntity;
 import goodroad.users.repository.UserRepo;
+import goodroad.validation.TrustedUrlService;
 import goodroad.volunteer.repository.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,8 +44,19 @@ class VolunteerServiceTest {
     @Mock
     private StorageService storageService;
 
+    @Mock
+    private TrustedUrlService trustedUrls;
+
     @InjectMocks
     private VolunteerService service;
+
+    @BeforeEach
+    void configureTrustedUrls() {
+        lenient().when(trustedUrls.requireDobroProfileUrl(anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(trustedUrls.requireOwnedStorageUrl(anyString(), anyString(), anyLong(), anyString()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void shouldCreateVolunteerApplicationWithCertificateLinks() {
@@ -152,7 +165,7 @@ class VolunteerServiceTest {
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         HelpRequestEntity request = helpRequest(30L, requester, null, "OPEN");
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
+        when(requests.findByIdForUpdate(30L)).thenReturn(Optional.of(request));
         when(requests.save(request)).thenReturn(request);
 
         VolunteerService.HelpRequestResp result = service.acceptRequest("+79990000002", "30");
@@ -171,7 +184,7 @@ class VolunteerServiceTest {
         volunteer.setTotalPoints(80);
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
+        when(requests.findByIdForUpdate(30L)).thenReturn(Optional.of(request));
         when(requests.save(request)).thenReturn(request);
 
         VolunteerService.HelpRequestResp result = service.withdrawResponse("+79990000002", "30");
@@ -188,7 +201,7 @@ class VolunteerServiceTest {
         UserEntity volunteer = user(2L, "VOLUNTEER", "+79990000002");
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
+        when(requests.findByIdForUpdate(30L)).thenReturn(Optional.of(request));
         when(requests.save(request)).thenReturn(request);
 
         VolunteerService.HelpRequestResp result = service.setWalkRoute("+79990000001", "30", routeReq());
@@ -204,7 +217,7 @@ class VolunteerServiceTest {
         HelpRequestEntity request = helpRequest(30L, requester, volunteer, "ACCEPTED");
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000001"))).thenReturn(Optional.of(requester));
         when(users.findByPhoneHash(Crypto.sha256Hex("79990000002"))).thenReturn(Optional.of(volunteer));
-        when(requests.findById(30L)).thenReturn(Optional.of(request));
+        when(requests.findByIdForUpdate(30L)).thenReturn(Optional.of(request));
         when(requests.save(request)).thenReturn(request);
 
         VolunteerService.HelpRequestResp afterRequester = service.finishWalk("+79990000001", "30");
