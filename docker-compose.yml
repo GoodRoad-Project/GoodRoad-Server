@@ -63,6 +63,8 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    volumes:
+      - ./data:/app/data
 
 volumes:
   goodroad_db:

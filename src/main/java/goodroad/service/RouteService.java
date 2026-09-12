@@ -3,12 +3,8 @@ package goodroad.service;
 import com.graphhopper.ResponsePath;
 import com.graphhopper.util.CustomModel;
 import com.graphhopper.util.shapes.GHPoint;
-import goodroad.model.PathResponse;
-import goodroad.model.ResponseInfo;
-import goodroad.model.RouteRequest;
-import goodroad.model.RouteResponse;
+import goodroad.model.*;
 import goodroad.obstacle.ObstacleDBService;
-import goodroad.model.ObstacleForRouting;
 import goodroad.routing.CustomModelFactory;
 import goodroad.routing.RoutingBoundingBox;
 import org.springframework.stereotype.Service;
@@ -141,9 +137,9 @@ public class RouteService {
         log.info("Converting paths to response");
         List<PathResponse> paths =
                 List.of(
-                        toPathResponse(fastPath, "fast"),
-                        toPathResponse(balancedPath, "balanced"),
-                        toPathResponse(safePath, "safe")
+                        toPathResponse(fastPath, "fast", obstacles),
+                        toPathResponse(balancedPath, "balanced", obstacles),
+                        toPathResponse(safePath, "safe", obstacles)
                 );
 
         double took = (System.nanoTime() - startTime) / 1_000_000.0;
@@ -158,20 +154,35 @@ public class RouteService {
 
     private PathResponse toPathResponse(
             ResponsePath path,
-            String routeType
+            String routeType,
+            List<ObstacleForRouting> obstacles
     ) {
         log.info("Converting {} route to PathResponse", routeType);
+
         if (path == null) {
             log.error("Path is null for route type: {}", routeType);
             throw new RuntimeException("Path is null for " + routeType);
         }
 
         String encodedPolyline = toEncodedPolyline(path);
-        log.info( "{} route converted: distance={}, time={}ms, encodedLength={}",
+
+        List<ObstacleResponse> obstacleResponses = obstacles.stream()
+                .map(obstacle -> new ObstacleResponse(
+                        String.valueOf(obstacle.id()),
+                        obstacle.latitude(),
+                        obstacle.longitude(),
+                        obstacle.type(),
+                        obstacle.severityEstimate(),
+                        null
+                ))
+                .toList();
+
+        log.info("{} route converted: distance={}, time={}ms, encodedLength={}, obstacles={}",
                 routeType,
                 path.getDistance(),
                 path.getTime(),
-                encodedPolyline.length()
+                encodedPolyline.length(),
+                obstacleResponses.size()
         );
 
         return new PathResponse(
@@ -179,7 +190,7 @@ public class RouteService {
                 path.getTime(),
                 true,
                 encodedPolyline,
-                List.of(),
+                obstacleResponses,
                 routeType
         );
     }
