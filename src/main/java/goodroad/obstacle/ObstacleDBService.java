@@ -159,6 +159,7 @@ public class ObstacleDBService {
             ));
         }
 
+
         return new ObstacleCardResp(
                 feature.getId().toString(),
                 feature.getType(),

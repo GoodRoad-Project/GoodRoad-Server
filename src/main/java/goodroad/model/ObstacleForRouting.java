@@ -9,5 +9,6 @@ public record ObstacleForRouting(
         double longitude,
         Short severityEstimate,
         Map<String, Short> obstacleSeverityEstimates
+
 ) {
 }

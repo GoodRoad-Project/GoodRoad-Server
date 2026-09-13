@@ -54,6 +54,7 @@ public class RouteController {
                     "Failed to build route: " + e.getMessage(),
                     e
             );
+
         } finally {
             long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
             log.info("POST /routes completed in {} ms", elapsedMs);

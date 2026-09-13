@@ -19,7 +19,6 @@ public class ObstacleAreaFactory {
             ObstacleForRouting obstacle,
             double radiusMeters
     ) {
-
         double lat = obstacle.latitude();
         double lon = obstacle.longitude();
 

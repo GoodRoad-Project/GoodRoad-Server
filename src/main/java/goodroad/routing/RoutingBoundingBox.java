@@ -6,7 +6,6 @@ public record RoutingBoundingBox(
         double minLon,
         double maxLon
 ) {
-
     public static RoutingBoundingBox around(
             double startLat,
             double startLon,
