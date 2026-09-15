@@ -1,6 +1,12 @@
 FROM gradle:8.3-jdk17 AS build
 WORKDIR /app
 
+# Копируем сертификат
+COPY src/main/resources/graphhopper.crt /tmp/graphhopper.crt
+
+# Импортируем сертификат
+RUN keytool -import -trustcacerts -keystore /opt/java/openjdk/lib/security/cacerts -storepass changeit -noprompt -alias graphhopper -file /tmp/graphhopper.crt
+
 # Копируем файлы для сборки
 COPY build.gradle settings.gradle ./
 COPY src ./src
@@ -10,7 +16,20 @@ RUN gradle bootJar -x test --no-daemon
 
 # Финальный образ
 FROM eclipse-temurin:17-jdk
-WORKDIR /app
-COPY --from=build /app/build/libs/backend.jar ./backend.jar
 
-CMD ["java", "-jar", "backend.jar"]
+WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y curl unzip \
+    && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" \
+        -o "/tmp/awscliv2.zip" \
+    && unzip /tmp/awscliv2.zip -d /tmp \
+    && /tmp/aws/install \
+    && rm -rf /tmp/aws /tmp/awscliv2.zip \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/build/libs/backend.jar ./backend.jar
+COPY docker/download-map.sh ./download-map.sh
+
+RUN chmod +x ./download-map.sh
+
+CMD ["sh", "-c", "./download-map.sh && exec java -jar backend.jar"]
