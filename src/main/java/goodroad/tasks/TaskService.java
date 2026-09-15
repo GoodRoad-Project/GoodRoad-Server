@@ -199,7 +199,7 @@ public class TaskService {
                 .filter(target -> target.getStatus() == null || !"UNAVAILABLE".equals(target.getStatus()))
                 .collect(Collectors.groupingBy(TaskTargetEntity::getTaskId, LinkedHashMap::new, Collectors.toList()));
         Set<Long> doneTargetIds = user == null ? Set.of() : targetCompletions.findByUserIdAndTaskIdIn(user.getId(), taskIds).stream()
-                                                            .map(UserTaskTargetCompletionEntity::getTargetId).collect(Collectors.toSet());
+                .map(UserTaskTargetCompletionEntity::getTargetId).collect(Collectors.toSet());
         return rawTasks.stream().map(task -> {
             List<TargetView> targetViews = byTask.getOrDefault(task.getId(), List.of()).stream()
                     .map(target -> new TargetView(target.getId().toString(), target.getTargetType(), target.getTargetId().toString(), target.getTitle(), target.getLatitude(), target.getLongitude(), doneTargetIds.contains(target.getId())))
@@ -434,7 +434,35 @@ public class TaskService {
 
     private String address(ObstacleFeatureEntity f) {
         String place = trim(f.getPlaceName());
-        String base = String.join(", ", java.util.stream.Stream.of(f.getCity(), f.getStreet(), f.getHouse()).filter(Objects::nonNull).filter(s -> !s.isBlank()).toList());
+        if (place != null && place.startsWith("[GOODROAD_OSM_SEED]")) {
+            place = null;
+        }
+
+        String city = trim(f.getCity());
+        String street = trim(f.getStreet());
+        String house = trim(f.getHouse());
+
+        if ("Безымянный участок".equalsIgnoreCase(street)) {
+            street = null;
+        }
+        if ("б/н".equalsIgnoreCase(house)) {
+            house = null;
+        }
+
+        String base = String.join(
+                ", ",
+                java.util.stream.Stream.of(city, street, house)
+                        .filter(Objects::nonNull)
+                        .filter(s -> !s.isBlank())
+                        .toList()
+        );
+
+        if (street == null && house == null && city != null) {
+            base = city + ", точка на карте";
+        } else if (base.isBlank()) {
+            base = "Точка на карте";
+        }
+
         return place == null ? base : place + ", " + base;
     }
 
