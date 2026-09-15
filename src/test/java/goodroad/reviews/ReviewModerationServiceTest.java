@@ -73,6 +73,23 @@ class ReviewModerationServiceTest {
     }
 
     @Test
+    void shouldNotAwardSameReviewTwiceAfterResubmission() {
+        UserEntity moderator = user(2L, Role.MODERATOR.name());
+        ObstacleReviewEntity review = review();
+        review.setTakenByModeratorId(2L);
+        review.setAwardedPoints(20);
+        when(users.findByPhoneHash(anyString())).thenReturn(Optional.of(moderator));
+        when(reviews.findByIdForUpdate(10L)).thenReturn(Optional.of(review));
+        when(photos.existsByReviewId(10L)).thenReturn(true);
+
+        service.approve("+79990000003", "10");
+
+        assertEquals(20, review.getAwardedPoints());
+        verify(users, never()).save(any(UserEntity.class));
+        verify(reviewSupport).recomputeFeatureAggregate(100L);
+    }
+
+    @Test
     void shouldRejectTakenReview() {
         UserEntity moderator = user(2L, Role.MODERATOR.name());
         ObstacleReviewEntity review = review();

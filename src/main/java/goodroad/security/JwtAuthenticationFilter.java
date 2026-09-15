@@ -44,10 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String phoneNorm = Crypto.normPhone(claims.getSubject());
             String role = claims.get("role", String.class);
 
-            String tokenType = claims.get(JwtService.TOKEN_TYPE_CLAIM, String.class);
-            boolean accessToken = tokenType == null || JwtService.ACCESS_TOKEN_TYPE.equals(tokenType);
-
-            if (!phoneNorm.isEmpty() && role != null && accessToken) {
+            if (!phoneNorm.isEmpty() && role != null && jwtService.isAccessToken(claims)) {
                 UserEntity user = users.findByPhoneHash(Crypto.sha256Hex(phoneNorm)).orElse(null);
                 if (user != null && user.isActive() && role.equals(user.getRole())) {
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

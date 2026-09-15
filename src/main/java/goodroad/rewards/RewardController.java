@@ -1,6 +1,9 @@
 package goodroad.rewards;
 
 import lombok.RequiredArgsConstructor;
+import goodroad.points.PointLedgerService;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
@@ -10,6 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RewardController {
     private final RewardService service;
+    private final PointLedgerService points;
 
     @GetMapping
     public List<RewardService.RewardOfferView> list(
@@ -17,14 +21,7 @@ public class RewardController {
             @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false, defaultValue = "price_asc") String sort) {
 
-        long start = System.nanoTime();
-
-        try {
-            return service.listOffers(minPrice, maxPrice, sort);
-        } finally {
-            long ms = (System.nanoTime() - start) / 1_000_000;
-            System.out.println("GET /rewards took " + ms + " ms");
-        }
+        return service.listOffers(minPrice, maxPrice, sort);
     }
 
     @PostMapping("/{id}/purchase")
@@ -33,17 +30,42 @@ public class RewardController {
     }
 
     @GetMapping("/account")
-    public RewardService.AccountResp getUserPointsInfo(Authentication authentication) {
-        return service.getUserPointsInfo(authentication.getName());
+    public PointLedgerService.PointsAccountView getUserPointsInfo(Authentication authentication) {
+        return points.account(authentication.getName());
     }
 
     @GetMapping("/history")
     public List<goodroad.points.PointLedgerService.PointTransactionView> history(Authentication authentication) {
-        return service.getPurchaseHistory(authentication.getName());
+        return points.historyForCurrentUser(authentication.getName()).transactions();
     }
 
     @GetMapping("/leaderboard")
-    public List<RewardService.LeaderboardItem> getLeaderboard() {
-        return service.getLeaderboard();
+    public List<PointLedgerService.LeaderboardItem> getLeaderboard() {
+        return points.leaderboard();
+    }
+
+    @GetMapping("/me")
+    public RewardService.UserRewardsResp currentUserRewards(Authentication authentication) {
+        return service.listCurrentUserRewards(authentication.getName());
+    }
+
+    @PostMapping("/me/{purchaseId}/redeem")
+    public RewardService.UserRewardView redeem(Authentication authentication, @PathVariable String purchaseId) {
+        return service.redeem(authentication.getName(), purchaseId);
+    }
+
+    @DeleteMapping("/me/{purchaseId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteUserReward(Authentication authentication, @PathVariable String purchaseId) {
+        service.deleteUserReward(authentication.getName(), purchaseId);
+    }
+
+    @PostMapping("/admin/offers/{offerId}/inventory")
+    @PreAuthorize("hasRole('MODERATOR_ADMIN')")
+    public RewardService.InventoryCreatedResp addInventory(
+            @PathVariable String offerId,
+            @RequestBody List<RewardService.InventoryItemReq> requests
+    ) {
+        return service.addInventory(offerId, requests);
     }
 }
