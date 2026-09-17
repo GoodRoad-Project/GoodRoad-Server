@@ -119,14 +119,14 @@ public class ReviewValidationService {
                 );
 
         String street =
-                InputRules.requireCyrillicText(
+                InputRules.requireAddressText(
                         raw.street(),
                         "ADDRESS_STREET_INVALID",
                         "Street"
                 );
 
         String house =
-                InputRules.requireDigits(
+                InputRules.requireAddressText(
                         raw.house(),
                         "ADDRESS_HOUSE_INVALID",
                         "House"
