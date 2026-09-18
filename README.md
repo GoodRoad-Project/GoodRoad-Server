@@ -43,7 +43,7 @@
 
 ## Архитектура сервера
 <p align="center">-
-  <img src="images/new_server_scheme.png" alt="Архитектура сервера" width="974">
+  <img src="images/new_scheme_server.png" alt="Архитектура сервера" width="974">
 </p>
 
 
