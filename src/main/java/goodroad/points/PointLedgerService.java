@@ -121,7 +121,7 @@ public class PointLedgerService {
         if (points >= 1000) return "Герой района";
         if (points >= 500) return "Проводник добра";
         if (points >= 100) return "Разведчик тротуаров";
-        return "Новичок GoodRoad";
+        return "Новичок";
     }
 
     private int safeAdd(Integer currentValue, int amount) {
